@@ -49,7 +49,7 @@ def main(args):
         device = T.device("cuda:0")
     else:
         print("Setting CPU as device..")
-        device = T.device("cp")
+        device = T.device("cpu")
 
     env_name_formatted = all_args.env_name.split(":")[1]
 
