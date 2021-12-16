@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from pathlib import Path
@@ -31,6 +32,12 @@ def parse_args(args, parser):
     parser.add_argument("--fov_radius", type=int, default=3)
 
     return parser.parse_known_args(args)[0]
+
+
+def save_args(args, file_dir):
+    file = file_dir / "args.txt"
+    with open(str(file), "w") as f:
+        json.dump(args.__dict__, f, indent=2)
 
 
 def main(args):
@@ -77,6 +84,10 @@ def main(args):
         + str(curr_run)
     )
 
+    # save arguments for this run
+    save_args(all_args, run_dir)
+
+    # set seeds
     T.manual_seed(all_args.seed)
     T.cuda.manual_seed(all_args.seed)
     np.random.seed(all_args.seed)
@@ -105,7 +116,7 @@ def main(args):
     }
 
     total_num_steps = 0
-    runner = TJCRunner(config=config)
+    runner = TJCRunner(config=config)  # specific runner for tjc-gym env
     while total_num_steps < all_args.num_env_steps:
         total_num_steps = runner.run()
 
