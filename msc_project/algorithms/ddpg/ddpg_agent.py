@@ -21,13 +21,18 @@ class DDPGAgent:
         self.fc1_dims = args.hidden_size1
         self.fc2_dims = args.hidden_size2
 
+        self.obs_space = policy_info["obs_space"]
+        self.act_space = policy_info["act_space"]
+
         self.obs_dim = policy_info["obs_space"].shape[0]
         self.act_dims = policy_info["act_space"].shape[0]
 
         self.memory = ReplayBuffer(args.buffer_size, self.obs_dim, self.act_dims)
 
-        # TODO get noise parameters from args
-        self.noise = GaussianActionNoise(mean=0, std=0.3, decay=1e-5, min_std=0)
+        decay = (args.act_noise_std_start - args.act_noise_std_min) / args.act_noise_decay_end_step
+        self.noise = GaussianActionNoise(
+            mean=0, std=args.act_noise_std_start, decay=decay, min_std=args.act_noise_std_min
+        )
 
         self.device = device
 
@@ -70,7 +75,7 @@ class DDPGAgent:
         )
 
     def get_random_actions(self, obs):
-        raise NotImplementedError
+        return [self.act_space.sample()[0] for _ in range(len(obs))]
 
     def choose_action(self, observation, explore=False):
         self.actor.eval()

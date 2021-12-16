@@ -8,8 +8,8 @@ class TJCRunner(BaseRunner):
         super().__init__(config)
 
         # TODO warm up - remove?
-        num_warmup_eps = max((int(self.batch_size // self.episode_length) + 1, self.args.num_random_episodes))
-        # self.warmup(num_warmup_eps)
+        num_warmup_eps = max((int(self.batch_size // self.max_episode_length) + 1, self.args.num_random_episodes))
+        self.warmup(num_warmup_eps)
 
     def run_episode(self, explore=True, training_episode=True, warmup=False):
         env_info = {}
@@ -64,13 +64,11 @@ class TJCRunner(BaseRunner):
 
         return env_info
 
-    @T.no_grad()
     def warmup(self, num_warmup_eps):
-        self.trainer.prep_rollout()
         warmup_rewards = []
         print("Warm up...")
         for _ in range(num_warmup_eps):
             env_info = self.run_episode(explore=True, training_episode=False, warmup=True)
-            warmup_rewards.append(env_info["avg_ep_reward"])
+            warmup_rewards.append(env_info["ep_reward"])
         warmup_reward = np.mean(warmup_rewards)
         print(f"Average reward during warm up: {warmup_reward}")

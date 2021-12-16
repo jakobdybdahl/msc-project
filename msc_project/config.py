@@ -48,13 +48,27 @@ def get_config():
     parser.add_argument(
         "--num_random_episodes",
         type=int,
-        default=1,
+        default=0,
         help="Number of episodes to add to buffer with purely random actions",
     )
-    parser.add_argument("--act_noise_std_start", type=float, default=0.3, help="Action noise standard deviation")
+    parser.add_argument(
+        "--act_noise_std_start", type=float, default=0.3, help="Start value for action noise standard deviation"
+    )
+    parser.add_argument(
+        "--act_noise_std_min",
+        type=float,
+        default=0.0,
+        help="Min value for action noise standard deviation. Decays to this value at 'act_noise_decay_end_step'",
+    )
+    parser.add_argument(
+        "--act_noise_decay_end_step",
+        type=int,
+        default=2000000,
+        help="Number of environment steps where noise should be added to actions",
+    )
 
     # train parameters
-    parser.add_argument("--episode_length", type=int, default=1000, help="Max length for any episode")
+    parser.add_argument("--max_episode_length", type=int, default=500, help="Max length for any episode")
     parser.add_argument(
         "--actor_train_interval_step", type=int, default=1, help="After how many critic updates actor should be updated"
     )

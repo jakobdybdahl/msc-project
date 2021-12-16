@@ -14,7 +14,7 @@ class BaseRunner(object):
         self.device = config["device"]
 
         self.num_env_steps = self.args.num_env_steps
-        self.episode_length = self.args.episode_length
+        self.max_episode_length = self.args.max_episode_length
         self.buffer_size = self.args.buffer_size
         self.batch_size = self.args.batch_size
         self.train_interval = self.args.train_interval
@@ -43,8 +43,7 @@ class BaseRunner(object):
 
         # setup trainers and policy dependent on algorithm to be used
         if self.algorithm_name == "ddpg":
-            from msc_project.algorithms.ddpg.ddpg import DDPG as Trainer
-            from msc_project.algorithms.ddpg.ddpg import DDPGAgent as Agent
+            from msc_project.algorithms.ddpg.ddpg_agent import DDPGAgent as Agent
         elif self.algorithm_name == "maddpg":
             # TODO
             raise NotImplementedError
@@ -52,8 +51,6 @@ class BaseRunner(object):
             raise NotImplementedError
 
         self.agent = Agent(self.args, self.policy_info, self.device)
-
-        self.trainer = Trainer(self.args, self.agent, self.env, self.device)
 
         # variables used during training
         self.total_env_steps = 0
