@@ -9,7 +9,7 @@ def get_config():
     parser.add_argument(
         "--num_env_steps", type=int, default=1000000, help="number of steps in environment to train for"
     )
-    parser.add_argument("--seed", type=int, default=1, help="random seed for numpy/torch")
+    parser.add_argument("--seed", type=int, default=2, help="random seed for numpy/torch")
 
     # env
     parser.add_argument("--env_name", type=str, default="tjc_gym:TrafficJunctionContinuous6-v0")
@@ -48,7 +48,7 @@ def get_config():
         default=1,
         help="Number of episodes to add to buffer with purely random actions",
     )
-    parser.add_argument("--act_noise_std", type=float, default=0.1, help="Action noise")
+    parser.add_argument("--act_noise_std_start", type=float, default=0.3, help="Action noise standard deviation")
 
     # train parameters
     parser.add_argument("--episode_length", type=int, default=1000, help="Max length for any episode")

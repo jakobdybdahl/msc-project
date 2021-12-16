@@ -1,3 +1,4 @@
+import numpy as np
 import torch as T
 
 
@@ -8,10 +9,8 @@ class GaussianActionNoise:
         self.decay = decay
         self.min_std = min_std
 
-    def __call__(self, shape=None):
-        size = 1 if shape == None else shape
-
-        x = T.empty(size).normal_(mean=self.mean, std=self.std)
+    def __call__(self):
+        x = np.random.normal(loc=self.mean, scale=self.std)
 
         new_std = self.std - self.decay
 

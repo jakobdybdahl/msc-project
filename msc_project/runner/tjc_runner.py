@@ -1,9 +1,9 @@
 import numpy as np
 import torch as T
-from msc_project.runner.base_runner import MlpRunner
+from msc_project.runner.base_runner import BaseRunner
 
 
-class TJCRunner(MlpRunner):
+class TJCRunner(BaseRunner):
     def __init__(self, config) -> None:
         super().__init__(config)
 
@@ -12,46 +12,53 @@ class TJCRunner(MlpRunner):
         # self.warmup(num_warmup_eps)
 
     def run_episode(self, explore=True, training_episode=True, warmup=False):
-        env = self.env
-        obs = env.reset()
-
         env_info = {}
+        num_collisions = 0
+        num_unique_collisions = 0
+        num_steps = 0
         episode_rewards = []
 
+        # TODO get from args?
         render = True
 
-        for step in range(self.episode_length):
+        env = self.env
+        obs = env.reset()
+        dones = [False] * self.num_agents
+
+        while not all(dones):
             if render:
                 env.render()
 
             if warmup:
-                actions = self.policy.get_random_actions(obs)
+                actions = self.agent.get_random_actions(obs)
             else:
-                actions = self.policy.get_actions(obs, explore=explore)
+                actions = self.agent.get_actions(obs, explore=explore)
 
             nobs, rewards, dones, info = env.step(actions)
 
-            episode_rewards.append(rewards)
-
             if explore:
-                for i in range(self.num_agents):
-                    self.buffer.insert(obs[i], actions[i], rewards[i], nobs[i], dones[i])
+                self.agent.store_transistion(obs, actions, rewards, nobs, dones, info)
 
             obs = nobs
 
             if training_episode:
                 self.total_env_steps += 1
                 if self.last_train_t == 0 or ((self.total_env_steps - self.last_train_t) / self.train_interval) >= 1:
-                    self.batch_train()
+                    self.learn()
                     self.total_train_steps += 1
                     self.last_train_t = self.total_env_steps
 
-            env_done = np.all(dones)
-            if env_done:
-                break
+            # update env info vars
+            episode_rewards.append(rewards)
+            num_collisions += info["collisions"]
+            num_unique_collisions += info["unique_collisions"]
+            num_steps += 1
 
-        avg_ep_reward = np.mean(np.sum(episode_rewards, axis=0))
-        env_info["avg_ep_reward"] = avg_ep_reward
+        ep_reward = np.sum(episode_rewards)
+        env_info["ep_reward"] = ep_reward
+        env_info["ep_steps"] = num_steps
+        env_info["collisions"] = num_collisions
+        env_info["unique_collisions"] = num_unique_collisions
 
         return env_info
 

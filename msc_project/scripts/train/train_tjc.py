@@ -12,6 +12,7 @@ from msc_project.runner.tjc_runner import TJCRunner
 
 def make_train_env(args):
     env = gym.make(args.env_name)
+    seedings = env.seed(args.seed)
 
     # gym wraps the original env, so we get the inner and sets variables from args
     inner = env.env
@@ -76,7 +77,6 @@ def main(args):
         + str(curr_run)
     )
 
-    # TODO set seeds in torch and numpy - get seed from args?
     T.manual_seed(all_args.seed)
     T.cuda.manual_seed(all_args.seed)
     np.random.seed(all_args.seed)

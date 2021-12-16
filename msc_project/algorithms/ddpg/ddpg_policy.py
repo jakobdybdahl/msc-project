@@ -9,73 +9,73 @@ from msc_project.utils.noise import GaussianActionNoise
 class DDPGAgent:
     def __init__(
         self,
-        alpha,
-        beta,
-        input_dims,
-        tau,
-        n_actions,
+        args,
+        policy_info,
         device,
-        gamma=0.99,
-        max_size=1000000,
-        fc1_dims=400,
-        fc2_dims=300,
-        batch_size=64,
         checkpoint_dir="tmp/ddpg",
     ) -> None:
-        self.gamma = gamma
-        self.tau = tau
-        self.batch_size = batch_size
-        self.alpha = alpha
-        self.beta = beta
+        self.gamma = args.gamma
+        self.tau = args.tau
+        self.batch_size = args.batch_size
+        self.alpha = args.lr_actor
+        self.beta = args.lr_critic
+        self.fc1_dims = args.hidden_size1
+        self.fc2_dims = args.hidden_size2
 
-        self.memory = ReplayBuffer(max_size, input_dims, n_actions)
+        self.obs_dim = policy_info["obs_space"].shape[0]
+        self.act_dims = policy_info["act_space"].shape[0]
+
+        self.memory = ReplayBuffer(args.buffer_size, self.obs_dim, self.act_dims)
 
         # TODO get noise parameters from args
-        self.noise = GaussianActionNoise(0, 0.3, decay=5e-6, min_std=0.01)
+        self.noise = GaussianActionNoise(0, 0.3, decay=1e-5, min_std=0)
 
         self.device = device
 
         self.actor = ActorNetwork(
-            alpha,
-            input_dims,
-            fc1_dims,
-            fc2_dims,
-            n_actions=n_actions,
+            self.alpha,
+            self.obs_dim,
+            self.fc1_dims,
+            self.fc2_dims,
+            n_actions=self.act_dims,
             checkpoint_dir=checkpoint_dir,
             name="actor",
             device=device,
         )
         self.critic = CriticNetwork(
-            beta,
-            input_dims,
-            fc1_dims,
-            fc2_dims,
-            n_actions=n_actions,
+            self.beta,
+            self.obs_dim,
+            self.fc1_dims,
+            self.fc2_dims,
+            n_actions=self.act_dims,
             checkpoint_dir=checkpoint_dir,
             name="critic",
             device=device,
         )
 
         self.target_actor = ActorNetwork(
-            alpha,
-            input_dims,
-            fc1_dims,
-            fc2_dims,
-            n_actions=n_actions,
+            self.alpha,
+            self.obs_dim,
+            self.fc1_dims,
+            self.fc2_dims,
+            n_actions=self.act_dims,
             checkpoint_dir=checkpoint_dir,
             name="target_actor",
             device=device,
         )
         self.target_critic = CriticNetwork(
-            beta,
-            input_dims,
-            fc1_dims,
-            fc2_dims,
-            n_actions=n_actions,
+            self.beta,
+            self.obs_dim,
+            self.fc1_dims,
+            self.fc2_dims,
+            n_actions=self.act_dims,
             checkpoint_dir=checkpoint_dir,
             name="target_critic",
             device=device,
         )
+
+    def get_random_actions(self, obs):
+        raise NotImplementedError
 
     def choose_action(self, observation, explore=False):
         self.actor.eval()
@@ -85,7 +85,7 @@ class DDPGAgent:
         mu = self.actor.forward(state).to(self.device)
 
         if self.noise != None and explore:
-            noise = self.noise().to(self.device)
+            noise = T.tensor(self.noise()).to(self.actor.device)
             mu_prime = T.add(mu, noise).to(self.device)
             mu_prime.clamp_(0, 1)
         else:
@@ -95,8 +95,13 @@ class DDPGAgent:
 
         return mu_prime.cpu().detach().numpy()[0]
 
-    def remember(self, state, action, reward, state_, done):
-        self.memory.store_transition(state, action, reward, state_, done)
+    def get_actions(self, obs, explore=True):
+        return [self.choose_action(obs[i], explore) for i in range(len(obs))]
+
+    def store_transistion(self, obs, acts, rewards, nobs, dones, info):
+        for i in range(len(obs)):
+            done = dones[i] or not info["cars_on_road"][i]
+            self.memory.store_transition(obs[i], acts[i], rewards[i], nobs[i], done)
 
     def save_models(self, path=None):
         print("Saving checkpoints..")

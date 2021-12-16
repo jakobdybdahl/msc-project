@@ -1,14 +1,12 @@
 import os
 
-from msc_project.utils.buffer import PolicyBuffer
-from numpy import exp
-from torch.functional import align_tensors
+import numpy as np
 
 
-class Runner(object):
+class BaseRunner(object):
     def __init__(self, config) -> None:
         """
-        Base class for training MLP policies
+        Base class for training policies
         :param config: (dict) Dictionary containing parameters for training
         """
 
@@ -28,6 +26,11 @@ class Runner(object):
         self.num_agents = config["num_agents"]
         self.agent_ids = [i for i in range(self.num_agents)]
 
+        self.running_avg_size = 40
+        self.avg_buffer_size = self.running_avg_size
+        self.avg_buffer_idx_cntr = 0
+        self.avg_buffer = np.zeros(self.avg_buffer_size)
+
         # TODO parralel envs?
         self.env = config["env"]
         self.env_name = self.args.env_name
@@ -41,13 +44,16 @@ class Runner(object):
         # setup trainers and policy dependent on algorithm to be used
         if self.algorithm_name == "ddpg":
             from msc_project.algorithms.ddpg.ddpg import DDPG as Trainer
+            from msc_project.algorithms.ddpg.ddpg import DDPGAgent as Agent
         elif self.algorithm_name == "maddpg":
             # TODO
             raise NotImplementedError
         else:
             raise NotImplementedError
 
-        self.trainer = Trainer(self.args, self.env, self.device)
+        self.agent = Agent(self.args, self.policy_info, self.device)
+
+        self.trainer = Trainer(self.args, self.agent, self.env, self.device)
 
         # variables used during training
         self.total_env_steps = 0
@@ -57,12 +63,39 @@ class Runner(object):
         self.last_save_t = 0  # total_env_steps value at last save
 
     def run(self):
-        ep_env_steps = self.trainer.run_episode(self.num_episodes, training_episode=True, explore=True)
+        env_info = self.run_episode(explore=True, training_episode=True)
 
-        self.total_env_steps += ep_env_steps
+        self.log(env_info)
+
+        self.total_env_steps += env_info["ep_steps"]
         self.num_episodes += 1
-
         return self.total_env_steps  # self.total_env_steps
+
+    def log(self, env_info):
+        steps = env_info["ep_steps"]
+        score = env_info["ep_reward"]
+        n_collisions = env_info["collisions"]
+        n_unique_collisions = env_info["unique_collisions"]
+
+        # keep track of last eps avg score
+        idx = self.avg_buffer_idx_cntr % self.avg_buffer_size
+        self.avg_buffer[idx] = env_info["ep_reward"]
+        self.avg_buffer_idx_cntr += 1
+
+        # calculate avg score
+        max_els = min(self.avg_buffer_idx_cntr, self.avg_buffer_size)
+        avg_score = self.avg_buffer[0:max_els].mean()
+
+        print(f"Episode {self.num_episodes}. {steps} steps. Noise std: {self.agent.noise.std}")
+        if n_collisions == 0:
+            print(f"\tSUCCES\tScore = {score}\tAvg. score = {avg_score}")
+        else:
+            print(
+                f"\tFAILED\tCollisions = {n_unique_collisions}/{n_collisions} \tScore = {score}\tAvg. score = {avg_score}"
+            )
+
+    def learn(self):
+        self.agent.learn()
 
     def save(self):
         print("Saving models..")

@@ -8,24 +8,13 @@ from msc_project.utils.util import to_torch
 
 
 class DDPG(Trainer):
-    def __init__(self, args, env, device):
+    def __init__(self, args, agent, env, device):
         self.args = args
         self.env = env
         self.device = device
         self.num_agents = env.n_agents
 
-        self.agent = DDPGAgent(
-            alpha=args.lr_actor,
-            beta=args.lr_critic,
-            input_dims=gym.spaces.flatdim(env.observation_space[0]),
-            tau=args.tau,
-            batch_size=args.batch_size,
-            fc1_dims=args.hidden_size1,
-            fc2_dims=args.hidden_size2,
-            n_actions=env.action_space[0].shape[0],
-            max_size=args.buffer_size,
-            device=device,
-        )
+        self.agent = agent
 
         self.hist = []
         self.running_avg_size = 50
