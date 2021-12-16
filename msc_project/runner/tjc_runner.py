@@ -16,10 +16,10 @@ class TJCRunner(BaseRunner):
         num_collisions = 0
         num_unique_collisions = 0
         num_steps = 0
+        timedout = False
         episode_rewards = []
 
-        # TODO get from args?
-        render = True
+        render = self.args.render
 
         env = self.env
         obs = env.reset()
@@ -53,12 +53,14 @@ class TJCRunner(BaseRunner):
             num_collisions += info["collisions"]
             num_unique_collisions += info["unique_collisions"]
             num_steps += 1
+            timedout = info["timedout"]
 
         ep_reward = np.sum(episode_rewards)
         env_info["ep_reward"] = ep_reward
         env_info["ep_steps"] = num_steps
         env_info["collisions"] = num_collisions
         env_info["unique_collisions"] = num_unique_collisions
+        env_info["timedout"] = timedout
 
         return env_info
 

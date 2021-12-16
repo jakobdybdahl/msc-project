@@ -13,6 +13,9 @@ def get_config():
 
     # env
     parser.add_argument("--env_name", type=str, default="tjc_gym:TrafficJunctionContinuous6-v0")
+    parser.add_argument(
+        "--render", type=bool, default=True, help="wether the environment should be rendered at each step"
+    )
 
     # buffer
     parser.add_argument(
@@ -66,8 +69,17 @@ def get_config():
     parser.add_argument(
         "--save_interval",
         type=int,
-        default=100000,
-        help="After how many episodes of training the policy model should be saved",
+        default=100,
+        help="Interval in episodes the learned model should be saved",
     )
+    parser.add_argument(
+        "--running_avg_size",
+        type=int,
+        default=50,
+        help="How many of last episodes to include when calculating average reward. Used to find 'Best model'",
+    )
+
+    # continue from pretrained
+    parser.add_argument("--model_dir", type=str, default=None)
 
     return parser

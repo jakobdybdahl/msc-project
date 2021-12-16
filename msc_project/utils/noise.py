@@ -9,8 +9,8 @@ class GaussianActionNoise:
         self.decay = decay
         self.min_std = min_std
 
-    def __call__(self):
-        x = np.random.normal(loc=self.mean, scale=self.std)
+    def __call__(self, shape=None):
+        x = np.random.normal(loc=self.mean, scale=self.std, size=shape)
 
         new_std = self.std - self.decay
 

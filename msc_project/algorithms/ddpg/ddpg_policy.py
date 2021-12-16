@@ -12,7 +12,6 @@ class DDPGAgent:
         args,
         policy_info,
         device,
-        checkpoint_dir="tmp/ddpg",
     ) -> None:
         self.gamma = args.gamma
         self.tau = args.tau
@@ -28,7 +27,7 @@ class DDPGAgent:
         self.memory = ReplayBuffer(args.buffer_size, self.obs_dim, self.act_dims)
 
         # TODO get noise parameters from args
-        self.noise = GaussianActionNoise(0, 0.3, decay=1e-5, min_std=0)
+        self.noise = GaussianActionNoise(mean=0, std=0.3, decay=1e-5, min_std=0)
 
         self.device = device
 
@@ -38,7 +37,6 @@ class DDPGAgent:
             self.fc1_dims,
             self.fc2_dims,
             n_actions=self.act_dims,
-            checkpoint_dir=checkpoint_dir,
             name="actor",
             device=device,
         )
@@ -48,7 +46,6 @@ class DDPGAgent:
             self.fc1_dims,
             self.fc2_dims,
             n_actions=self.act_dims,
-            checkpoint_dir=checkpoint_dir,
             name="critic",
             device=device,
         )
@@ -59,7 +56,6 @@ class DDPGAgent:
             self.fc1_dims,
             self.fc2_dims,
             n_actions=self.act_dims,
-            checkpoint_dir=checkpoint_dir,
             name="target_actor",
             device=device,
         )
@@ -69,7 +65,6 @@ class DDPGAgent:
             self.fc1_dims,
             self.fc2_dims,
             n_actions=self.act_dims,
-            checkpoint_dir=checkpoint_dir,
             name="target_critic",
             device=device,
         )
@@ -96,7 +91,23 @@ class DDPGAgent:
         return mu_prime.cpu().detach().numpy()[0]
 
     def get_actions(self, obs, explore=True):
-        return [self.choose_action(obs[i], explore) for i in range(len(obs))]
+        self.actor.eval()
+
+        obs = T.tensor(obs, dtype=T.float).to(self.device)
+        mu = self.actor.forward(obs).to(self.device)
+
+        if self.noise != None and explore:
+            noise = T.tensor(self.noise(mu.shape)).to(self.actor.device)
+            mu_prime = T.add(mu, noise).to(self.device)
+            mu_prime.clamp_(0, 1)
+        else:
+            mu_prime = mu
+
+        self.actor.train()
+
+        return mu_prime.view(-1).cpu().detach().numpy()
+
+        # return [self.choose_action(obs[i], explore) for i in range(len(obs))]
 
     def store_transistion(self, obs, acts, rewards, nobs, dones, info):
         for i in range(len(obs)):
@@ -104,14 +115,12 @@ class DDPGAgent:
             self.memory.store_transition(obs[i], acts[i], rewards[i], nobs[i], done)
 
     def save_models(self, path=None):
-        print("Saving checkpoints..")
         self.actor.save_checkpoint(path)
         self.target_actor.save_checkpoint(path)
         self.critic.save_checkpoint(path)
         self.target_critic.save_checkpoint(path)
 
     def load_models(self, path=None):
-        print("Loading checkpoints..")
         self.actor.load_checkpoint(path)
         self.target_actor.load_checkpoint(path)
         self.critic.load_checkpoint(path)

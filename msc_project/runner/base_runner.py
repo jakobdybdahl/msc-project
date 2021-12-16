@@ -19,6 +19,7 @@ class BaseRunner(object):
         self.batch_size = self.args.batch_size
         self.train_interval = self.args.train_interval
         self.save_interval = self.args.save_interval
+        self.running_avg_size = self.args.running_avg_size
 
         self.algorithm_name = self.args.algorithm_name
         self.policy_info = config["policy_info"]
@@ -26,10 +27,9 @@ class BaseRunner(object):
         self.num_agents = config["num_agents"]
         self.agent_ids = [i for i in range(self.num_agents)]
 
-        self.running_avg_size = 40
-        self.avg_buffer_size = self.running_avg_size
-        self.avg_buffer_idx_cntr = 0
-        self.avg_buffer = np.zeros(self.avg_buffer_size)
+        # logging
+        self.results = []
+        self.best_score = None
 
         # TODO parralel envs?
         self.env = config["env"]
@@ -60,15 +60,26 @@ class BaseRunner(object):
         self.num_episodes = 0
         self.total_train_steps = 0
         self.last_train_t = 0  # total_env_steps value at last train
-        self.last_save_t = 0  # total_env_steps value at last save
+        self.last_save_ep = 0  # total_env_steps value at last save
 
     def run(self):
+        # get episode
         env_info = self.run_episode(explore=True, training_episode=True)
 
+        # log info
         self.log(env_info)
 
-        self.total_env_steps += env_info["ep_steps"]
         self.num_episodes += 1
+
+        # periodically save
+        if (self.num_episodes - self.last_save_ep) / self.save_interval >= 1:
+            self.save()
+            self.last_save_ep = self.num_episodes
+
+        # TODO evaluate
+
+        # set variables before next run
+        self.total_env_steps += env_info["ep_steps"]
         return self.total_env_steps  # self.total_env_steps
 
     def log(self, env_info):
@@ -76,15 +87,25 @@ class BaseRunner(object):
         score = env_info["ep_reward"]
         n_collisions = env_info["collisions"]
         n_unique_collisions = env_info["unique_collisions"]
+        timedout = env_info["timedout"]
+        success = not timedout and n_collisions == 0
 
-        # keep track of last eps avg score
-        idx = self.avg_buffer_idx_cntr % self.avg_buffer_size
-        self.avg_buffer[idx] = env_info["ep_reward"]
-        self.avg_buffer_idx_cntr += 1
+        # save stats to results
+        self.results.append([self.num_episodes, score, steps, success, n_collisions, n_unique_collisions, timedout])
 
         # calculate avg score
-        max_els = min(self.avg_buffer_idx_cntr, self.avg_buffer_size)
-        avg_score = self.avg_buffer[0:max_els].mean()
+        max_els = min(len(self.results), self.running_avg_size)
+        last_hist = np.array(self.results[-max_els:])
+        avg_score = np.mean(last_hist[:, 1])
+
+        # set best score (but first after number of episodes as size of running average)
+        if self.num_episodes >= self.running_avg_size:
+            if self.best_score == None:
+                self.best_score = avg_score
+                self.save_best()
+            elif avg_score > self.best_score:
+                self.best_score = avg_score
+                self.save_best()
 
         print(f"Episode {self.num_episodes}. {steps} steps. Noise std: {self.agent.noise.std}")
         if n_collisions == 0:
@@ -98,8 +119,22 @@ class BaseRunner(object):
         self.agent.learn()
 
     def save(self):
-        print("Saving models..")
-        self.policy.save_model()
+        print(f"Saving models for episode {self.num_episodes}")
+
+        path = self.save_dir + f"/ep_{self.num_episodes}"
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        self.agent.save_models(path)
+
+    def save_best(self):
+        print(f"New best model found in episode {self.num_episodes}")
+
+        path = self.save_dir + "/best"
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        self.agent.save_models(path)
 
     def load(self):
         print("Loading models..")
