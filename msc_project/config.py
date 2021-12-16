@@ -6,15 +6,13 @@ def get_config():
 
     parser.add_argument("--algorithm_name", type=str, default="ddpg", choices=["maddpg", "ddpg"])
     parser.add_argument("--experiment_name", type=str, default="debug")
-    parser.add_argument(
-        "--num_env_steps", type=int, default=1000000, help="number of steps in environment to train for"
-    )
+    parser.add_argument("--num_env_steps", type=int, default=1000, help="number of steps in environment to train for")
     parser.add_argument("--seed", type=int, default=2, help="random seed for numpy/torch")
 
     # env
     parser.add_argument("--env_name", type=str, default="tjc_gym:TrafficJunctionContinuous6-v0")
     parser.add_argument(
-        "--render", type=bool, default=True, help="wether the environment should be rendered at each step"
+        "--render", type=bool, dest="render", default=False, help="wether the environment should be rendered at each step"
     )
 
     # buffer
@@ -63,7 +61,7 @@ def get_config():
     parser.add_argument(
         "--act_noise_decay_end_step",
         type=int,
-        default=2000000,
+        default=200000,
         help="Number of environment steps where noise should be added to actions",
     )
 
@@ -71,9 +69,6 @@ def get_config():
     parser.add_argument("--max_episode_length", type=int, default=500, help="Max length for any episode")
     parser.add_argument(
         "--actor_train_interval_step", type=int, default=1, help="After how many critic updates actor should be updated"
-    )
-    parser.add_argument(
-        "--train_interval_episode", type=int, default=1, help="Number of env steps between updates to actor/critic"
     )
     parser.add_argument(
         "--train_interval", type=int, default=1, help="Number of episodes between updates to actor/critic"

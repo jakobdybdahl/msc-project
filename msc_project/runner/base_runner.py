@@ -136,3 +136,8 @@ class BaseRunner(object):
     def load(self):
         print("Loading models..")
         self.policy.load_model()
+
+    def save_results(self):
+        header = "episode, reward, steps, success, n_collisions, n_unique_collisions, timedout"
+        file = self.run_dir / "results.csv"
+        np.savetxt(str(file), self.results, header=header, delimiter=",", fmt="%s", comments="")

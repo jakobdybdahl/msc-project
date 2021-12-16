@@ -13,7 +13,11 @@ from msc_project.runner.tjc_runner import TJCRunner
 
 def make_train_env(args):
     env = gym.make(args.env_name)
-    seedings = env.seed(args.seed)
+    env.seed(args.seed)
+
+    # prepare action space (represents all action spaces)
+    act_space = env.action_space[0]
+    act_space.seed(args.seed)
 
     # gym wraps the original env, so we get the inner and sets variables from args
     inner = env.env
@@ -22,7 +26,7 @@ def make_train_env(args):
     inner.step_cost = args.step_cost_factor
     inner.collision_cost = args.collision_cost
 
-    return env
+    return env, act_space
 
 
 def parse_args(args, parser):
@@ -92,8 +96,8 @@ def main(args):
     T.cuda.manual_seed(all_args.seed)
     np.random.seed(all_args.seed)
 
-    # create environment
-    env = make_train_env(all_args)
+    # create environment. act_space is to parse to policy_config
+    env, act_space = make_train_env(all_args)
     num_agents = env.n_agents
 
     # setup info for policies
@@ -101,7 +105,7 @@ def main(args):
     cent_obs_dim = obs_shape[0] * obs_shape[1] * obs_shape[2] * env.n_agents
     policy_info = {
         "obs_space": gym.spaces.flatten_space(env.observation_space[0]),
-        "act_space": gym.spaces.flatten_space(env.action_space[0]),
+        "act_space": act_space,
         "cent_act_dim": env.action_space[0].shape[0] * env.n_agents,
         "cent_obs_dim": cent_obs_dim,
     }
@@ -119,10 +123,10 @@ def main(args):
     runner = TJCRunner(config=config)  # specific runner for tjc-gym env
     while total_num_steps < all_args.num_env_steps:
         total_num_steps = runner.run()
-
     env.close()
 
-    # TODO save logs / report ?
+    # save results obtained by runner
+    runner.save_results()
 
 
 if __name__ == "__main__":
