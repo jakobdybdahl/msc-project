@@ -5,7 +5,7 @@ from numpy import exp
 from torch.functional import align_tensors
 
 
-class MlpRunner(object):
+class Runner(object):
     def __init__(self, config) -> None:
         """
         Base class for training MLP policies
@@ -40,10 +40,7 @@ class MlpRunner(object):
 
         # setup trainers and policy dependent on algorithm to be used
         if self.algorithm_name == "ddpg":
-            # from msc_project.algorithms.ddpg.buffer import ReplayBuffer as Buffer
             from msc_project.algorithms.ddpg.ddpg import DDPG as Trainer
-
-            # from msc_project.algorithms.ddpg.ddpg_policy import DDPGPolicy as Policy
         elif self.algorithm_name == "maddpg":
             # TODO
             raise NotImplementedError
@@ -54,15 +51,16 @@ class MlpRunner(object):
 
         # variables used during training
         self.total_env_steps = 0
-        self.num_episodes_collected = 0
+        self.num_episodes = 0
         self.total_train_steps = 0
         self.last_train_t = 0  # total_env_steps value at last train
         self.last_save_t = 0  # total_env_steps value at last save
 
     def run(self):
-        ep_env_steps = self.trainer.run_episode(training_episode=True, explore=True)
+        ep_env_steps = self.trainer.run_episode(self.num_episodes, training_episode=True, explore=True)
 
         self.total_env_steps += ep_env_steps
+        self.num_episodes += 1
 
         return self.total_env_steps  # self.total_env_steps
 

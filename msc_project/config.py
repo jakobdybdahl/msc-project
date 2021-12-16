@@ -16,12 +16,15 @@ def get_config():
 
     # buffer
     parser.add_argument(
-        "--buffer_size", type=int, default=1000000, help="Max # of transitions that replay buffer can contain"
+        "--buffer_size", type=int, default=2000000, help="Max # of transitions that replay buffer can contain"
     )
 
     # network
     parser.add_argument(
-        "--hidden_size", type=int, default=400, help="Dimension of first hidden layer for actor/critic networks"
+        "--hidden_size1", type=int, default=400, help="Dimension of first hidden layer for actor/critic networks"
+    )
+    parser.add_argument(
+        "--hidden_size2", type=int, default=300, help="Dimension of second hidden layer for actor/critic networks"
     )
 
     # optimizer

@@ -31,7 +31,7 @@ class DDPGAgent:
         self.memory = ReplayBuffer(max_size, input_dims, n_actions)
 
         # TODO get noise parameters from args
-        self.noise = GaussianActionNoise(0, 0.3, decay=1e-5, min_std=0.01)
+        self.noise = GaussianActionNoise(0, 0.3, decay=5e-6, min_std=0.01)
 
         self.device = device
 
