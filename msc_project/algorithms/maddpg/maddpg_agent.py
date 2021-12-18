@@ -20,6 +20,11 @@ class MADDPGAgent:
         self.act_dims = policy_info["act_space"].shape[0]
         self.agent_count = policy_info["num_agents"]
 
+        decay = (args.act_noise_std_start - args.act_noise_std_min) / args.act_noise_decay_end_step
+        self.noise = GaussianActionNoise(
+            mean=0, std=args.act_noise_std_start, decay=decay, min_std=args.act_noise_std_min
+        )
+
         self.brain = Brain(
             agent_count=self.agent_count,
             observation_size=self.obs_dim,
@@ -28,9 +33,7 @@ class MADDPGAgent:
             beta=args.lr_critic,
             soft_update_tau=args.tau,
             discount_gamma=args.gamma,
-            act_noise_std_start=args.act_noise_std_start,
-            act_noise_std_min=args.act_noise_std_min,
-            act_noise_decay_end_step=args.act_noise_decay_end_step,
+            noise=self.noise,
             device=device
         )
 

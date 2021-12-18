@@ -16,9 +16,7 @@ class Brain:
                  beta,
                  soft_update_tau,
                  discount_gamma,
-                 act_noise_std_start,
-                 act_noise_std_min,
-                 act_noise_decay_end_step,
+                 noise,
                  device):
 
         self._soft_update_tau = soft_update_tau
@@ -36,11 +34,7 @@ class Brain:
         self._actor_optimizer = optim.Adam(self._actor_local.parameters(), lr=alpha)
         self._critic_optimizer = optim.Adam(self._critic_local.parameters(), lr=beta)
 
-        decay = (act_noise_std_start - act_noise_std_min) / act_noise_decay_end_step
-        self.noise = GaussianActionNoise(
-            mean=0, std=act_noise_std_start, decay=decay, min_std=act_noise_std_min
-        )
-
+        self.noise = noise
         self.device = device
 
     def get_actor_model_states(self):
