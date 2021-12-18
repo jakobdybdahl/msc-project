@@ -25,7 +25,7 @@ def make_train_env(args):
     inner.step_cost = args.step_cost_factor
     inner.collision_cost = args.collision_cost
 
-    if args.algorithm_name is 'maddpg':
+    if args.algorithm_name == 'maddpg':
         inner.reward_callback = lambda rewards, n_agents: [sum(rewards)] * n_agents
 
     return env, act_space
