@@ -77,24 +77,6 @@ class DDPGAgent:
     def get_random_actions(self, obs):
         return [self.act_space.sample()[0] for _ in range(len(obs))]
 
-    def choose_action(self, observation, explore=False):
-        self.actor.eval()
-
-        observation = np.array(observation)
-        state = T.tensor(observation, dtype=T.float).to(self.device)
-        mu = self.actor.forward(state).to(self.device)
-
-        if self.noise != None and explore:
-            noise = T.tensor(self.noise()).to(self.actor.device)
-            mu_prime = T.add(mu, noise).to(self.device)
-            mu_prime.clamp_(0, 1)
-        else:
-            mu_prime = mu
-
-        self.actor.train()
-
-        return mu_prime.cpu().detach().numpy()[0]
-
     def get_actions(self, obs, explore=True):
         self.actor.eval()
 
@@ -104,15 +86,14 @@ class DDPGAgent:
         if self.noise != None and explore:
             noise = T.tensor(self.noise(mu.shape)).to(self.actor.device)
             mu_prime = T.add(mu, noise).to(self.device)
-            mu_prime.clamp_(0, 1)
         else:
             mu_prime = mu
+
+        mu_prime.clamp_(0, 1)  # inplace clamp
 
         self.actor.train()
 
         return mu_prime.view(-1).cpu().detach().numpy()
-
-        # return [self.choose_action(obs[i], explore) for i in range(len(obs))]
 
     def store_transistion(self, obs, acts, rewards, nobs, dones, info):
         for i in range(len(obs)):

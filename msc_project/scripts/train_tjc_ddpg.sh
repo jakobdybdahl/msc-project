@@ -1,7 +1,6 @@
 #!/bin/sh
 algo="ddpg"
 experiment="pure_ddpg"
-num_env_steps=500000
 env="tjc_gym:TrafficJunctionContinuous6-v0"
 # render=0
 buffer_size=1000000
@@ -37,7 +36,6 @@ do
   python ./train/train_tjc.py \
   --algorithm_name ${algo} \
   --experiment_name ${experiment} \
-  --num_env_steps ${num_env_steps} \
   --env_name ${env} \
   --seed ${seed} \
   ${render:+--render "$render"} \

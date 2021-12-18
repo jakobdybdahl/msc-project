@@ -9,6 +9,7 @@ import setproctitle
 import torch as T
 from msc_project.config import get_config
 from msc_project.runner.tjc_runner import TJCRunner
+from msc_project.utils.logger import EpochLogger
 
 def make_train_env(args):
     env = gym.make(args.env_name)
@@ -24,6 +25,7 @@ def make_train_env(args):
     inner.arrive_prob = args.arrive_prob
     inner.step_cost = args.step_cost_factor
     inner.collision_cost = args.collision_cost
+    inner.max_steps = args.max_agent_episode_steps
 
     if args.algorithm_name == 'maddpg':
         inner.reward_callback = lambda rewards, n_agents: [sum(rewards)] * n_agents
@@ -38,12 +40,6 @@ def parse_args(args, parser):
     parser.add_argument("--fov_radius", type=int, default=3)
 
     return parser.parse_known_args(args)[0]
-
-
-def save_args(args, file_dir):
-    file = file_dir / "args.txt"
-    with open(str(file), "w") as f:
-        json.dump(args.__dict__, f, indent=2)
 
 
 def main(args):
@@ -90,9 +86,6 @@ def main(args):
         + str(curr_run)
     )
 
-    # save arguments for this run
-    save_args(all_args, run_dir)
-
     # set seeds
     T.manual_seed(all_args.seed)
     T.cuda.manual_seed(all_args.seed)
@@ -101,6 +94,10 @@ def main(args):
     # create environment. act_space is to parse to policy_config
     env, act_space = make_train_env(all_args)
     num_agents = env.n_agents
+
+    # setup logger and save args for this run
+    logger = EpochLogger(output_dir=str(run_dir))
+    logger.save_config(all_args.__dict__)
 
     # setup info for policies
     obs_shape = env.observation_space[0].shape
@@ -120,16 +117,14 @@ def main(args):
         "num_agents": num_agents,
         "device": device,
         "run_dir": run_dir,
+        "logger": logger,
     }
 
-    total_num_steps = 0
     runner = TJCRunner(config=config)  # specific runner for tjc-gym env
-    while total_num_steps < all_args.num_env_steps:
-        total_num_steps = runner.run()
-    env.close()
+    for _ in range(all_args.epochs):
+        runner.run_epoch()
 
-    # save results obtained by runner
-    runner.save_results()
+    env.close()
 
 
 if __name__ == "__main__":
