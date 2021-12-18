@@ -10,7 +10,6 @@ import torch as T
 from msc_project.config import get_config
 from msc_project.runner.tjc_runner import TJCRunner
 
-
 def make_train_env(args):
     env = gym.make(args.env_name)
     env.seed(args.seed)
@@ -25,6 +24,9 @@ def make_train_env(args):
     inner.arrive_prob = args.arrive_prob
     inner.step_cost = args.step_cost_factor
     inner.collision_cost = args.collision_cost
+
+    if args.algorithm_name is 'maddpg':
+        inner.reward_callback = lambda rewards, n_agents: [sum(rewards)] * n_agents
 
     return env, act_space
 
@@ -106,6 +108,7 @@ def main(args):
     policy_info = {
         "obs_space": gym.spaces.flatten_space(env.observation_space[0]),
         "act_space": act_space,
+        "num_agents": num_agents,
         "cent_act_dim": env.action_space[0].shape[0] * env.n_agents,
         "cent_obs_dim": cent_obs_dim,
     }
