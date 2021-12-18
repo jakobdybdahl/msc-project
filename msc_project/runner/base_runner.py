@@ -1,4 +1,5 @@
 import os
+import time
 
 import numpy as np
 
@@ -13,13 +14,17 @@ class BaseRunner(object):
         self.args = config["args"]
         self.device = config["device"]
 
-        self.num_env_steps = self.args.num_env_steps
-        self.max_episode_length = self.args.max_episode_length
+        self.num_epochs = self.args.epochs
+        self.episodes_per_epoch = self.args.episodes_per_epoch
+
+        self.max_agent_episode_steps = self.args.max_agent_episode_steps
         self.buffer_size = self.args.buffer_size
         self.batch_size = self.args.batch_size
         self.train_interval = self.args.train_interval
+
         self.save_interval = self.args.save_interval
         self.running_avg_size = self.args.running_avg_size
+        self.num_eval_episodes = self.args.num_eval_episodes
 
         self.algorithm_name = self.args.algorithm_name
         self.policy_info = config["policy_info"]
@@ -27,19 +32,22 @@ class BaseRunner(object):
         self.num_agents = config["num_agents"]
         self.agent_ids = [i for i in range(self.num_agents)]
 
-        # logging
-        self.results = []
-        self.best_score = None
-
         # TODO parralel envs?
         self.env = config["env"]
         self.env_name = self.args.env_name
+
+        # TODO evaluation env?
 
         # dir
         self.run_dir = config["run_dir"]
         self.save_dir = f"{self.run_dir}/models"
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
+
+        # logging
+        self.best_score = None
+        self.logger = config["logger"]
+        self.start_time = time.time()
 
         # setup trainers and policy dependent on algorithm to be used
         if self.algorithm_name == "ddpg":
@@ -59,63 +67,88 @@ class BaseRunner(object):
         self.last_train_t = 0  # total_env_steps value at last train
         self.last_save_ep = 0  # total_env_steps value at last save
 
-    def run(self):
-        # get episode
-        env_info = self.run_episode(explore=True, training_episode=True)
+    def eval_agent(self):
+        raise NotImplementedError
 
-        # log info
-        self.log(env_info)
+    def run_epoch(self):
+        for _ in range(self.episodes_per_epoch):
+            # get episode
+            ep_info = self.run_episode(explore=True, training_episode=True)
+            self.num_episodes += 1
 
-        self.num_episodes += 1
+            # log episode info
+            self.log(ep_info)
 
-        # periodically save
-        if (self.num_episodes - self.last_save_ep) / self.save_interval >= 1:
-            self.save()
-            self.last_save_ep = self.num_episodes
+            self.total_env_steps += ep_info["env_steps"]
 
-        # TODO evaluate
+        # end of epoch handling
+        epoch = self.num_episodes // self.episodes_per_epoch
 
-        # set variables before next run
-        self.total_env_steps += env_info["ep_steps"]
-        return self.total_env_steps  # self.total_env_steps
+        # save policy
+        if epoch % self.save_interval == 0 or epoch == self.num_epochs:
+            self.save_policy()
 
-    def log(self, env_info):
-        steps = env_info["ep_steps"]
-        score = env_info["ep_reward"]
-        n_collisions = env_info["collisions"]
-        n_unique_collisions = env_info["unique_collisions"]
-        timedout = env_info["timedout"]
-        success = not timedout and n_collisions == 0
+        self.eval_agent()
 
-        # save stats to results
-        self.results.append([self.num_episodes, score, steps, success, n_collisions, n_unique_collisions, timedout])
+        self.logger.log("epoch", epoch)
+        self.logger.log("reward", with_min_and_max=True)
+        self.logger.log("test_reward", with_min_and_max=True)
+        self.logger.log("steps", average_only=True)
+        self.logger.log("test_steps", average_only=True)
+        self.logger.log("total_env_steps", self.total_env_steps)
+        self.logger.log("total_episodes", self.num_episodes)
+        self.logger.log("time", time.time() - self.start_time)
 
-        # calculate avg score
-        max_els = min(len(self.results), self.running_avg_size)
-        last_hist = np.array(self.results[-max_els:])
-        avg_score = np.mean(last_hist[:, 1])
+        # TODO call epoch log env specific runner to add env specific logs
 
-        # set best score (but first after number of episodes as size of running average)
-        if self.num_episodes >= self.running_avg_size:
-            if self.best_score == None:
-                self.best_score = avg_score
-                self.save_best()
-            elif avg_score > self.best_score:
-                self.best_score = avg_score
-                self.save_best()
+        self.logger.dump()
 
-        print(f"Episode {self.num_episodes}. {steps} steps. Noise std: {self.agent.noise.std}")
-        if n_collisions == 0:
-            print(f"\tSUCCES\tScore = {score}\tAvg. score = {avg_score}")
-        else:
-            print(
-                f"\tFAILED\tCollisions = {n_unique_collisions}/{n_collisions} \tScore = {score}\tAvg. score = {avg_score}"
-            )
+    def run_episode(self, explore=True, training_episode=True, warmup=False):
+        raise NotImplementedError
+
+    def log(self, ep_info):
+        raise NotImplementedError
+
+    def log_eval(self, ep_info):
+        raise NotImplementedError
+
+    # def log(self, env_info):
+    #     steps = env_info["ep_steps"]
+    #     score = env_info["ep_reward"]
+    #     n_collisions = env_info["collisions"]
+    #     n_unique_collisions = env_info["unique_collisions"]
+    #     timedout = env_info["timedout"]
+    #     success = not timedout and n_collisions == 0
+
+    #     # save stats to results
+    #     self.results.append([self.num_episodes, score, steps, success, n_collisions, n_unique_collisions, timedout])
+
+    #     # calculate avg score
+    #     max_els = min(len(self.results), self.running_avg_size)
+    #     last_hist = np.array(self.results[-max_els:])
+    #     avg_score = np.mean(last_hist[:, 1])
+
+    #     # set best score (but first after number of episodes as size of running average)
+    #     if self.num_episodes >= self.running_avg_size:
+    #         if self.best_score == None:
+    #             self.best_score = avg_score
+    #             self.save_best()
+    #         elif avg_score > self.best_score:
+    #             self.best_score = avg_score
+    #             self.save_best()
+
+    #     print(f"Episode {self.num_episodes}. {steps} steps. Noise std: {self.agent.noise.std}")
+    #     if n_collisions == 0:
+    #         print(f"\tSUCCES\tScore = {score}\tAvg. score = {avg_score}")
+    #     else:
+    #         print(
+    #             f"\tFAILED\tCollisions = {n_unique_collisions}/{n_collisions} \tScore = {score}\tAvg. score = {avg_score}"
+    #         )
 
     def learn(self):
         self.agent.learn()
 
-    def save(self):
+    def save_policy(self):
         print(f"Saving models for episode {self.num_episodes}")
 
         path = self.save_dir + f"/ep_{self.num_episodes}"
@@ -125,6 +158,7 @@ class BaseRunner(object):
         self.agent.save_models(path)
 
     def save_best(self):
+        # TODO call this method
         print(f"New best model found in episode {self.num_episodes}")
 
         path = self.save_dir + "/best"

@@ -6,13 +6,16 @@ def get_config():
 
     parser.add_argument("--algorithm_name", type=str, default="ddpg", choices=["maddpg", "ddpg"])
     parser.add_argument("--experiment_name", type=str, default="debug")
-    parser.add_argument("--num_env_steps", type=int, default=1000, help="number of steps in environment to train for")
     parser.add_argument("--seed", type=int, default=2, help="random seed for numpy/torch")
 
     # env
     parser.add_argument("--env_name", type=str, default="tjc_gym:TrafficJunctionContinuous6-v0")
     parser.add_argument(
-        "--render", type=bool, dest="render", default=False, help="wether the environment should be rendered at each step"
+        "--render",
+        type=bool,
+        dest="render",
+        default=False,
+        help="wether the environment should be rendered at each step",
     )
 
     # buffer
@@ -66,20 +69,30 @@ def get_config():
     )
 
     # train parameters
-    parser.add_argument("--max_episode_length", type=int, default=500, help="Max length for any episode")
+    parser.add_argument(
+        "--max_agent_episode_steps", type=int, default=500, help="Max number of steps for a single agent in an episode"
+    )
     parser.add_argument(
         "--actor_train_interval_step", type=int, default=1, help="After how many critic updates actor should be updated"
     )
+    parser.add_argument("--train_interval", type=int, default=1, help="Number of steps between updates to actor/critic")
+    parser.add_argument("--episodes_per_epoch", type=int, default=15, help="Number of episodes in each epoch")
+    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to run and train agent")
+
+    # evaulate parameters
     parser.add_argument(
-        "--train_interval", type=int, default=1, help="Number of episodes between updates to actor/critic"
+        "--num_eval_episodes",
+        type=int,
+        default=100,
+        help="Number of episodes to evaluate the policy at the end of each epoch",
     )
 
     # save parameters
     parser.add_argument(
         "--save_interval",
         type=int,
-        default=100,
-        help="Interval in episodes the learned model should be saved",
+        default=10,
+        help="Interval in epochs the learned model should be saved",
     )
     parser.add_argument(
         "--running_avg_size",
@@ -88,7 +101,7 @@ def get_config():
         help="How many of last episodes to include when calculating average reward. Used to find 'Best model'",
     )
 
-    # continue from pretrained
-    parser.add_argument("--model_dir", type=str, default=None)
+    # load existing model
+    parser.add_argument("--model_dir", type=str, default=None, help="Path to directory with a 'models' folder")
 
     return parser
