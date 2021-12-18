@@ -48,9 +48,9 @@ class MADDPGAgent:
         self.t_step = 0
 
     def store_transistion(self, obs, actions, rewards, next_obs, dones, info):
-        self.memory.add(obs, actions, rewards, next_obs, dones[not info["cars_on_road"]].astype(np.uint8))
+        self.memory.store_transition(obs, actions, rewards, next_obs, dones)
 
-    def act_torch(self, obs, target, noise=0.0, train=False):
+    def act_torch(self, obs, target, explore=True, train=False):
         """Act based on the given batch of observations.
         :param obs: current observation, array of shape == (b, observation_size)
         :param noise: noise factor
@@ -58,7 +58,7 @@ class MADDPGAgent:
         :return: actions for given state as per current policy.
         """
         actions = [
-            self.brain.act(obs[:, i], target, noise, train)
+            self.brain.act(obs[:, i], target, explore, train)
             for i in range(self.agent_count)
         ]
 
@@ -66,14 +66,14 @@ class MADDPGAgent:
 
         return torch.clamp(actions, 0, 1)
 
-    def choose_action(self, obs, target=False, noise=0.0):
+    def get_actions(self, obs, explore=True, target=False, ):
         obs = torch.from_numpy(obs).float().\
             to(self.device).unsqueeze(0)
 
         with torch.no_grad():
             actions = np.vstack([
                 a.cpu().numpy()
-                for a in self.act_torch(obs, target, noise)
+                for a in self.act_torch(obs, target, explore)
             ])
 
         return actions.flatten()
@@ -86,7 +86,7 @@ class MADDPGAgent:
 
     def learn(self):
 
-        experiences = self.memory.sample()
+        experiences = self.memory.sample_buffer()
         experiences = self._tensor_experiences(experiences)
 
         observations, actions, rewards, next_observations, dones = experiences

@@ -49,7 +49,7 @@ class Brain:
     def get_critic_model_states(self):
         return self._critic_local.state_dict(), self._critic_target.state_dict()
 
-    def act(self, observation, target=False, noise=0.0, train=False):
+    def act(self, observation, target=False, explore=True, train=False):
         """
         :param observation: tensor of shape == (b, observation_size)
         :param target: true to evaluate with target
@@ -67,7 +67,8 @@ class Brain:
 
         action_values = actor(observation)
 
-        noise = torch.tensor(self.noise()).to(self.device)
+        if explore and self.noise is not None:
+            noise = torch.tensor(self.noise()).to(self.device)
 
         return action_values + noise
 
