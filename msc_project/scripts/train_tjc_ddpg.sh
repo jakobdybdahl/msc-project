@@ -1,4 +1,5 @@
 #!/bin/sh
+
 algo="ddpg"
 experiment="pure_ddpg"
 env="tjc_gym:TrafficJunctionContinuous6-v0"
@@ -16,10 +17,13 @@ num_random_episodes=1
 act_noise_std_start=0.3
 act_noise_std_min=0.0
 act_noise_decay_end_step=200000
-max_episode_length=500
+max_agent_episode_steps=500
 actor_train_interval_step=1
 train_interval=1
-save_interval=100
+episodes_per_epoch=15
+epochs=2
+num_eval_episodes=10
+save_interval=1
 running_avg_size=50
 step_cost_factor=-0.01
 collision_cost=-100
@@ -28,16 +32,21 @@ fov_radius=3
 
 echo "Env is ${env} and algo is ${algo}"
 
-seeds=(1 2 3 4 5)
+# check if running on UCloud server - if so, setup venv
+if [[ $USER = "ucloud" ]]; then
+  source /work/scripts/setup_ucloud.sh
+fi
+
+seeds=(2)
 for seed in "${seeds[@]}"
 do
   echo "Running experiment with seed = ${seed}"
 
-  python ./train/train_tjc.py \
+  python ./msc_project/scripts/train/train_tjc.py \
   --algorithm_name ${algo} \
   --experiment_name ${experiment} \
-  --env_name ${env} \
   --seed ${seed} \
+  --env_name ${env} \
   ${render:+--render "$render"} \
   --buffer_size ${buffer_size} \
   --hidden_size1 ${hidden_size1} \
@@ -52,9 +61,12 @@ do
   --act_noise_std_start ${act_noise_std_start} \
   --act_noise_std_min ${act_noise_std_min} \
   --act_noise_decay_end_step ${act_noise_decay_end_step} \
-  --max_episode_length ${max_episode_length} \
+  --max_agent_episode_steps ${max_agent_episode_steps} \
   --actor_train_interval_step ${actor_train_interval_step} \
   --train_interval ${train_interval} \
+  --episodes_per_epoch ${episodes_per_epoch} \
+  --epochs ${epochs} \
+  --num_eval_episodes ${num_eval_episodes} \
   --save_interval ${save_interval} \
   --running_avg_size ${running_avg_size} \
   --step_cost_factor ${step_cost_factor} \
@@ -65,3 +77,9 @@ do
   sleep 2
 done
 
+wait
+
+# Close container
+if [[ $USER = "ucloud" ]]; then
+  ps -ef | grep '/usr/local/bin/start-container' | grep -v grep | awk '{print $2}' | xargs -r kill -9
+fi

@@ -33,7 +33,7 @@ for seed in "${seeds[@]}"
 do
   echo "Running experiment with seed = ${seed}"
 
-  python3 ./train/train_tjc.py \
+  python ./train/train_tjc.py \
   --algorithm_name ${algo} \
   --experiment_name ${experiment} \
   --env_name ${env} \

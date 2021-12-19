@@ -11,6 +11,7 @@ from msc_project.config import get_config
 from msc_project.runner.tjc_runner import TJCRunner
 from msc_project.utils.logger import EpochLogger
 
+
 def make_train_env(args):
     env = gym.make(args.env_name)
     env.seed(args.seed)
@@ -27,7 +28,7 @@ def make_train_env(args):
     inner.collision_cost = args.collision_cost
     inner.max_steps = args.max_agent_episode_steps
 
-    if args.algorithm_name == 'maddpg':
+    if args.algorithm_name == "maddpg":
         inner.reward_callback = lambda rewards, n_agents: [sum(rewards)] * n_agents
 
     return env, act_space

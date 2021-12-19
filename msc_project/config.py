@@ -101,7 +101,7 @@ def get_config():
         help="How many of last episodes to include when calculating average reward. Used to find 'Best model'",
     )
 
-    # load existing model
+    # load existing model TODO - use somewhere
     parser.add_argument("--model_dir", type=str, default=None, help="Path to directory with a 'models' folder")
 
     return parser
