@@ -52,9 +52,8 @@ if __name__ == "__main__":
         "average_reward",
         "average_test_reward",
         "test_steps",
+        "std_test_reward",
     ]
-
-    print(data[:, header_names.index("num_timeout")])
 
     for name in names:
         # get episode scores
