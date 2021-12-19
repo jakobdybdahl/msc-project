@@ -100,14 +100,10 @@ def main(args):
     logger.save_config(all_args.__dict__)
 
     # setup info for policies
-    obs_shape = env.observation_space[0].shape
-    cent_obs_dim = obs_shape[0] * obs_shape[1] * obs_shape[2] * env.n_agents
     policy_info = {
         "obs_space": gym.spaces.flatten_space(env.observation_space[0]),
         "act_space": act_space,
         "num_agents": num_agents,
-        "cent_act_dim": env.action_space[0].shape[0] * env.n_agents,
-        "cent_obs_dim": cent_obs_dim,
     }
 
     config = {
