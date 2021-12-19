@@ -1,7 +1,7 @@
 #!/bin/sh
 
 echo "Setting up container.."
-sudo apt-get update
+sudo apt-get update -y
 
 # https://serverfault.com/questions/949991/how-to-install-tzdata-on-a-ubuntu-docker-image
 sudo DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
