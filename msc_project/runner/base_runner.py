@@ -53,8 +53,7 @@ class BaseRunner(object):
         if self.algorithm_name == "ddpg":
             from msc_project.algorithms.ddpg.ddpg_agent import DDPGAgent as Agent
         elif self.algorithm_name == "maddpg":
-            # TODO
-            raise NotImplementedError
+            from msc_project.algorithms.maddpg.maddpg_agent import MADDPGAgent as Agent
         else:
             raise NotImplementedError
 

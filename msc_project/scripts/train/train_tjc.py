@@ -11,7 +11,6 @@ from msc_project.config import get_config
 from msc_project.runner.tjc_runner import TJCRunner
 from msc_project.utils.logger import EpochLogger
 
-
 def make_train_env(args):
     env = gym.make(args.env_name)
     env.seed(args.seed)
@@ -27,6 +26,9 @@ def make_train_env(args):
     inner.step_cost = args.step_cost_factor
     inner.collision_cost = args.collision_cost
     inner.max_steps = args.max_agent_episode_steps
+
+    if args.algorithm_name == 'maddpg':
+        inner.reward_callback = lambda rewards, n_agents: [sum(rewards)] * n_agents
 
     return env, act_space
 
@@ -98,13 +100,10 @@ def main(args):
     logger.save_config(all_args.__dict__)
 
     # setup info for policies
-    obs_shape = env.observation_space[0].shape
-    cent_obs_dim = obs_shape[0] * obs_shape[1] * obs_shape[2] * env.n_agents
     policy_info = {
         "obs_space": gym.spaces.flatten_space(env.observation_space[0]),
         "act_space": act_space,
-        "cent_act_dim": env.action_space[0].shape[0] * env.n_agents,
-        "cent_obs_dim": cent_obs_dim,
+        "num_agents": num_agents,
     }
 
     config = {
