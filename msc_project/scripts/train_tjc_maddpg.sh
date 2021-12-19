@@ -1,7 +1,7 @@
 #!/bin/sh
 algo="maddpg"
 experiment="pure_maddpg"
-env="tjc_gym:TrafficJunctionContinuous4-v1"
+env="tjc_gym:TrafficJunctionContinuous6-v1"
 # render=0
 buffer_size=1000000
 hidden_size1=400
