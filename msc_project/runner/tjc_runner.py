@@ -7,7 +7,7 @@ class TJCRunner(BaseRunner):
     def __init__(self, config) -> None:
         super().__init__(config)
 
-        # TODO warm up - remove?
+        # warmup
         num_warmup_eps = max((int(self.batch_size // self.max_agent_episode_steps) + 1, self.args.num_random_episodes))
         self.warmup(num_warmup_eps)
 

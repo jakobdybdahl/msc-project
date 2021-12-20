@@ -98,8 +98,6 @@ class BaseRunner(object):
         self.logger.log("total_episodes", self.num_episodes)
         self.logger.log("time", time.time() - self.start_time)
 
-        # TODO call epoch log env specific runner to add env specific logs
-
         self.logger.dump()
 
     def run_episode(self, explore=True, training_episode=True, warmup=False):
