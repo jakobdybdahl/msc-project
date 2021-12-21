@@ -60,7 +60,7 @@ class CriticNetwork(nn.Module):
         x = self.conv1(state, edge_index)
         x = F.relu(x[agent_i])
 
-        state_value = self.fc1(state)
+        state_value = self.fc1(x)
         state_value = self.bn1(state_value)
         state_value = F.relu(state_value)
         state_value = self.fc2(state_value)
@@ -135,7 +135,7 @@ class GNNAgent(object):
         self.beta = 0.001
 
         self.buffer_size = int(5e5)
-        self.batch_size = 128
+        self.batch_size = 32
 
         self.obs_space = policy_info["obs_space"]
         self.act_space = policy_info["act_space"]
@@ -180,9 +180,9 @@ class GNNAgent(object):
             # construct edge index of graph for this given agnet
             edge_index = agent._get_edge_index(who_in_fov[i]).to(self.device)
             x = T.tensor(fov, dtype=T.float).to(self.device)
-            data = Data(x=x, edge_index=edge_index).to(self.device)
+            # data = Data(x=x, edge_index=edge_index).to(self.device)
 
-            mu = self.actor.forward(data.x, edge_index, i)
+            mu = self.actor.forward(x, edge_index, i)
 
             if self.noise != None and explore:
                 noise = T.tensor(self.noise(mu.shape)).to(self.actor.device)
@@ -203,44 +203,67 @@ class GNNAgent(object):
         nfov = nobs[0]
         ncomm = nobs[1]
 
-        for i in range(self.n_agents):
-            done = dones[i] or not info["cars_on_road"][i]
-            self.memory.store_transition((fov[i], comm[i]), acts[i], rewards[i], (nfov[i], ncomm[i]), done)
+        done = [dones[i] or not info["cars_on_road"][i] for i in range(len(dones))]
+
+        self.memory.store_transition(fov, comm, acts, rewards, nfov, ncomm, done)
+
+        # for i in range(self.n_agents):
+        #     done = dones[i] or not info["cars_on_road"][i]
+        #     self.memory.store_transition(fov[i], comm[i], acts[i], rewards[i], nfov[i], ncomm[i], done)
 
     def learn(self):
         if self.memory.mem_cntr < self.batch_size:
             return
 
-        (fov, comm), actions, rewards, (nfov, ncomm), done = self.memory.sample_buffer(self.batch_size)
+        fovs, comms, actions, rewards, nfovs, ncomms, dones = self.memory.sample_buffer(self.batch_size)
 
-        states = T.tensor(fov, dtype=T.float).to(self.device)
-        comm = T.tensor(comm, dtype=T.float).to(self.device)
-        nfov = T.tensor(nfov, dtype=T.float).to(self.device)
-        ncomm = T.tensor(ncomm, dtype=T.float).to(self.device)
-        actions = T.tensor(actions, dtype=T.float).to(self.device)
-        rewards = T.tensor(rewards, dtype=T.float).to(self.device)
-        done = T.tensor(done).to(self.device)
+        fovs = T.tensor(fovs, dtype=T.float).to(self.device)
+        nfovs = T.tensor(nfovs, dtype=T.float).to(self.device)
 
-        target_actions = self.target_actor.forward(nfov)
-        critic_value_ = self.target_critic.forward(nfov, target_actions)
-        critic_value = self.critic.forward(states, actions)
+        for agent_i in range(self.n_agents):
+            a_comm = comms[agent_i]
+            a_ncomm = ncomms[agent_i]
+            a_actions = T.tensor(actions[agent_i], dtype=T.float).to(self.device)
+            a_rewards = T.tensor(rewards[agent_i], dtype=T.float).to(self.device)
+            a_dones = T.tensor(dones[agent_i]).to(self.device)
 
-        critic_value_[done] = 0.0
-        critic_value_ = critic_value_.view(-1)
+            critic_values = T.empty(self.batch_size)
+            targets = T.empty(self.batch_size)
 
-        target = rewards + self.gamma * critic_value_
-        target = target.view(self.batch_size, 1)
+            for b in range(self.batch_size):
+                edge_index = self._get_edge_index(a_comm[b]).to(self.device)
+                next_edge_index = self._get_edge_index(a_ncomm[b]).to(self.device)
 
-        self.critic.optimizer.zero_grad()
-        critic_loss = F.mse_loss(target, critic_value)
-        critic_loss.backward()
-        self.critic.optimizer.step()
+                bnfovs = nfovs[:, b, :].squeeze()
+                bfovs = fovs[:, b, :].squeeze()
 
-        self.actor.optimizer.zero_grad()
-        actor_loss = -self.critic.forward(states, self.actor.forward(states))
-        actor_loss = T.mean(actor_loss)
-        actor_loss.backward()
-        self.actor.optimizer.step()
+                critic_value = self.critic.forward(bfovs, a_actions[b], edge_index, agent_i)
+
+                with T.no_grad():
+                    target_action = self.target_actor.forward(bnfovs, next_edge_index, agent_i)
+                    target_critic_value = self.target_critic.forward(bnfovs, target_action, next_edge_index, agent_i)
+                    target_critic_value = 0.0 if a_dones[b] else target_critic_value
+                    target = a_rewards[b] + self.gamma * target_critic_value
+
+                targets[b] = target
+                critic_values[b] = critic_value
+
+            self.critic.optimizer.zero_grad()
+            critic_loss = F.mse_loss(targets, critic_values)
+            critic_loss.backward()
+            self.critic.optimizer.step()
+
+            self.actor.optimizer.zero_grad()
+            actor_losses = T.empty(self.batch_size)
+            for b in range(self.batch_size):
+                edge_index = self._get_edge_index(a_comm[b]).to(self.device)
+                bnfovs = nfovs[:, b, :].squeeze()
+                action = self.actor.forward(bnfovs, edge_index, agent_i)
+                actor_loss = -self.critic.forward(bnfovs, action, edge_index, agent_i)
+                actor_losses[b] = actor_loss
+            actor_loss = T.mean(actor_losses)
+            actor_loss.backward()
+            self.actor.optimizer.step()
 
         self.update_network_parameters()
 
@@ -320,7 +343,16 @@ def train():
 
 
 if __name__ == "__main__":
+    seed = 1
+
     env = gym.make("tjc_gym:TrafficJunctionContinuous6-v0")
+
+    env.seed(seed)
+
+    # set seeds
+    T.manual_seed(seed)
+    T.cuda.manual_seed(seed)
+    np.random.seed(seed)
 
     policy_info = {"obs_space": env.observation_space[0], "act_space": env.action_space[0]}
 
@@ -328,14 +360,19 @@ if __name__ == "__main__":
 
     num_agents = env.n_agents
 
-    obs = env.reset()
-    acts = agent.get_random_actions()
-    nobs, rewards, dones, info = env.step(acts)
+    # train()
 
-    for i in range(agent.batch_size):
-        agent.store_transistion(obs, acts, rewards, nobs, dones, info)
+    # obs = env.reset()
+    # acts = agent.get_random_actions()
+    # nobs, rewards, dones, info = env.step(acts)
 
-    (fov, comm), actions, rewards, (nfov, ncomm), dones = agent.memory.sample_buffer(5)
+    # agent.store_transistion(obs, acts, rewards, nobs, dones, info)
+
+    # for i in range(agent.batch_size):
+    #     agent.store_transistion(obs, acts, rewards, nobs, dones, info)
+
+    # batch = agent.memory.sample_buffer(64)
+    # obs, connected_with, action, reward, nobs, next_connected_with, done = batch
 
     # acts = agent.get_actions(nobs)
 
