@@ -206,74 +206,71 @@ class GNNAgent(object):
         return actions
 
     def store_transistion(self, obs, acts, rewards, nobs, dones, info):
-        fov = obs[0]
-        comm = obs[1]
-        nfov = nobs[0]
-        ncomm = nobs[1]
+        fovs = obs[0]
+        comms = obs[1]
 
-        done = [dones[i] or not info["cars_on_road"][i] for i in range(len(dones))]
+        nfovs = nobs[0]
+        ncomms = nobs[1]
 
-        self.memory.store_transition(fov, comm, acts, rewards, nfov, ncomm, done)
+        for agent_i in range(num_agents):
+            done = dones[agent_i] or not info["cars_on_road"][agent_i]
+            agent.memory.store_transition(
+                agent_i, fovs, comms[agent_i], acts[agent_i], rewards[agent_i], nfovs, ncomms[agent_i], done
+            )
 
     def learn(self):
         if self.memory.mem_cntr < self.batch_size:
             return
 
-        # mini_batch = int(self.batch_size / self.n_agents)
-        mini_batch = self.batch_size
+        agent_idx, fovs, comms, actions, rewards, nfovs, ncomms, dones = self.memory.sample_buffer(self.batch_size)
 
-        fovs, comms, actions, rewards, nfovs, ncomms, dones = self.memory.sample_buffer(mini_batch)
-
+        agent_idx = T.tensor(agent_idx, dtype=T.int).to(self.device)
         fovs = T.tensor(fovs, dtype=T.float).to(self.device)
         nfovs = T.tensor(nfovs, dtype=T.float).to(self.device)
+        actions = T.tensor(actions, dtype=T.float).to(self.device)
+        rewards = T.tensor(rewards, dtype=T.float).to(self.device)
+        dones = T.tensor(dones).to(self.device)
 
-        for agent_i in range(self.n_agents):
-            a_actions = T.tensor(actions[agent_i], dtype=T.float).to(self.device)
-            a_rewards = T.tensor(rewards[agent_i], dtype=T.float).to(self.device)
-            a_dones = T.tensor(dones[agent_i]).to(self.device)
+        data_list = []
+        ndata_list = []
 
-            data_list = []
-            ndata_list = []
+        for b in range(len(agent_idx)):
+            comm = comms[b]
+            ncomm = ncomms[b]
 
-            for b in range(mini_batch):
-                a_comm = comms[agent_i][b]
-                a_ncomm = ncomms[agent_i][b]
+            edge_index = self._get_edge_index(comm)
+            n_edge_index = self._get_edge_index(ncomm)
 
-                bnfovs = nfovs[:, b, :].squeeze()
-                bfovs = fovs[:, b, :].squeeze()
+            data_list.append(Data(x=fovs[b], edge_index=edge_index))
+            ndata_list.append(Data(x=nfovs[b], edge_index=n_edge_index))
 
-                edge_index = agent._get_edge_index(a_comm)
-                n_edge_index = agent._get_edge_index(a_ncomm)
+        batch = Batch.from_data_list(data_list).to(device)
+        nbatch = Batch.from_data_list(ndata_list).to(device)
 
-                data_list.append(Data(x=bfovs, edge_index=edge_index))
-                ndata_list.append(Data(x=bnfovs, edge_index=n_edge_index))
+        agent_mask = T.zeros_like(batch.batch, dtype=T.bool)
+        for i, a in enumerate(agent_idx):
+            agent_mask[i * num_agents + a] = True
 
-            batch = Batch.from_data_list(data_list).to(self.device)
-            nbatch = Batch.from_data_list(ndata_list).to(self.device)
+        target_actions = self.target_actor.forward(nbatch, agent_mask)
+        target_critic_value = self.target_critic.forward(nbatch, target_actions, agent_mask)
+        critic_value = self.critic.forward(batch, actions, agent_mask)
 
-            agent_mask = T.zeros_like(batch.batch, dtype=T.bool)
-            agent_mask[agent_i : len(agent_mask) : self.n_agents] = True
+        critic_value[dones] = 0.0
+        target_critic_value = target_critic_value.view(-1)
 
-            target_actions = self.target_actor.forward(nbatch, agent_mask)
-            target_critic_value = self.target_critic.forward(nbatch, target_actions, agent_mask)
-            critic_value = self.critic.forward(batch, a_actions, agent_mask)
+        target = rewards + self.gamma * target_critic_value
+        target = target.view(self.batch_size, 1)
 
-            critic_value[a_dones] = 0.0
-            target_critic_value = target_critic_value.view(-1)
+        self.critic.optimizer.zero_grad()
+        critic_loss = F.mse_loss(target, critic_value)
+        critic_loss.backward()
+        self.critic.optimizer.step()
 
-            target = a_rewards + self.gamma * target_critic_value
-            target = target.view(mini_batch, 1)
-
-            self.critic.optimizer.zero_grad()
-            critic_loss = F.mse_loss(target, critic_value)
-            critic_loss.backward()
-            self.critic.optimizer.step()
-
-            self.actor.optimizer.zero_grad()
-            actor_loss = -self.critic.forward(batch, self.actor.forward(batch, agent_mask), agent_mask)
-            actor_loss = T.mean(actor_loss)
-            actor_loss.backward()
-            self.actor.optimizer.step()
+        self.actor.optimizer.zero_grad()
+        actor_loss = -self.critic.forward(batch, self.actor.forward(batch, agent_mask), agent_mask)
+        actor_loss = T.mean(actor_loss)
+        actor_loss.backward()
+        self.actor.optimizer.step()
 
         self.update_network_parameters()
 
@@ -344,6 +341,9 @@ def train():
             car_steps += info["took_step"]
             num_steps += 1
 
+            if sum(car_rewards) < -3000:
+                break
+
         ep_info["env_steps"] = num_steps
         ep_info["agent_rewards"] = car_rewards
         ep_info["agent_steps"] = car_steps
@@ -361,50 +361,26 @@ def train():
 
 
 def playground():
-    positions = [
-        # going left
-        ((0.575, 0.5375), (-1, 0)),
-        ((0.1, 0.5375), (-1, 0)),
-        # going right
-        ((0.425, 0.4625), (1, 0)),
-        # # ((0.1, -0.075), (1, 0)),
-        # # going down
-        ((0.4625, 0.575), (0, -1)),
-        # # ((-0.075, -0.075), (0, -1)),
-        # # ((-0.075, -0.3), (0, -1)),
-        # # going up
-        ((0.5375, 0.425), (0, 1)),
-    ]
-
-    agents = env.env._agents
-
-    for i, state in enumerate(positions):
-        agents[i].state.on_the_road = True
-        agents[i].state.route = 1
-        agents[i].state.direction = state[1]
-        agents[i].state.position = state[0]
-
-    env.render()
-
-    acts = agent.get_random_actions()
-    obs, _, _, _ = env.step(acts)
+    obs = env.reset()
 
     for i in range(agent.batch_size):
+        env.render()
         acts = agent.get_random_actions()
         nobs, rewards, dones, info = env.step(acts)
+
+        fovs = obs[0]
+        nfovs = nobs[0]
+
+        comms = obs[1]
+        ncomms = nobs[1]
 
         agent.store_transistion(obs, acts, rewards, nobs, dones, info)
 
         obs = nobs
 
-    agent.store_transistion(obs, acts, rewards, nobs, dones, info)
-
-    for i in range(agent.batch_size):
-        agent.store_transistion(obs, acts, rewards, nobs, dones, info)
-
     batch = agent.memory.sample_buffer(64)
 
-    fovs, comms, action, reward, nfovs, ncomms, done = batch
+    agent_idx, fovs, comms, action, reward, nfovs, ncomms, done = batch
 
     fovs = T.tensor(fovs, dtype=T.float).to(device)
     nfovs = T.tensor(nfovs, dtype=T.float).to(device)
@@ -412,31 +388,32 @@ def playground():
     data_list = []
     ndata_list = []
 
-    for b in range(64):
-        a_comm = comms[2][b]
-        a_ncomm = ncomms[2][b]
+    for b in range(len(agent_idx)):
+        comm = comms[b]
+        ncomm = ncomms[b]
 
-        bnfovs = nfovs[:, b, :].squeeze()
-        bfovs = fovs[:, b, :].squeeze()
+        edge_index = agent._get_edge_index(comm)
+        n_edge_index = agent._get_edge_index(ncomm)
 
-        edge_index = agent._get_edge_index(a_comm)
-        n_edge_index = agent._get_edge_index(a_ncomm)
-
-        data_list.append(Data(x=bfovs, edge_index=edge_index))
-        ndata_list.append(Data(x=bnfovs, edge_index=n_edge_index))
+        data_list.append(Data(x=fovs[b], edge_index=edge_index))
+        ndata_list.append(Data(x=nfovs[b], edge_index=n_edge_index))
 
     batch = Batch.from_data_list(data_list).to(device)
     nbatch = Batch.from_data_list(ndata_list).to(device)
 
     mask = T.zeros_like(batch.batch, dtype=T.bool)
 
-    mask[1 : len(mask) : num_agents] = True
+    for i, a in enumerate(agent_idx):
+        mask[i * num_agents + a] = True
 
-    test = agent.actor.conv1(x=batch.x, edge_index=batch.edge_index)
+    test = agent.actor.forward(batch, mask)
 
-    x = test[mask, :]
+    # x = test[mask, :]
 
-    # data1 =
+    print(agent_idx)
+    print(mask)
+
+    print("HELLO")
 
     # obs = env.reset()
     # acts = agent.get_random_actions()
@@ -473,6 +450,7 @@ def playground():
 
 if __name__ == "__main__":
     seed = 1
+    device = T.device("cuda")
 
     env = gym.make("tjc_gym:TrafficJunctionContinuous6-v0")
     env.env.collision_cost = -10
@@ -491,6 +469,6 @@ if __name__ == "__main__":
 
     num_agents = env.n_agents
 
-    # train()
+    train()
 
-    playground()
+    # playground()

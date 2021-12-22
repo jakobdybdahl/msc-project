@@ -14,34 +14,27 @@ class GNNReplayBuffer:
 
         self.n_agents = n_agents
 
-        self.obs_memory = []
-        self.next_obs_memory = []
-        self.action_memory = []
-        self.reward_memory = []
-        self.done_memory = []
-        self.connected_with_memory = []
-        self.next_connected_with_memory = []
+        self.agent_index_memory = np.zeros(self.mem_size, dtype=int)
+        self.action_memory = np.zeros((self.mem_size, n_actions), dtype=np.float32)
+        self.reward_memory = np.zeros(self.mem_size, dtype=np.float32)
+        self.done_memory = np.zeros(self.mem_size, dtype=np.bool)
+        self.connected_with_memory = np.zeros((self.mem_size, n_agents), dtype=int)
+        self.next_connected_with_memory = np.zeros((self.mem_size, n_agents), dtype=int)
 
-        for i in range(self.n_agents):
-            self.obs_memory.append(np.zeros((self.mem_size, obs_dim), dtype=np.float))
-            self.next_obs_memory.append(np.zeros((self.mem_size, obs_dim), dtype=np.float32))
-            self.action_memory.append(np.zeros((self.mem_size, n_actions), dtype=np.float32))
-            self.reward_memory.append(np.zeros(self.mem_size, dtype=np.float32))
-            self.done_memory.append(np.zeros(self.mem_size, dtype=np.bool))
-            self.connected_with_memory.append(np.zeros((self.mem_size, n_agents), dtype=int))
-            self.next_connected_with_memory.append(np.zeros((self.mem_size, n_agents), dtype=int))
+        self.obs_memory = np.zeros((self.mem_size, self.n_agents, obs_dim), dtype=np.float32)
+        self.next_obs_memory = np.zeros((self.mem_size, self.n_agents, obs_dim), dtype=np.float32)
 
-    def store_transition(self, obs, conns, actions, rewards, nobs, nconns, dones):
+    def store_transition(self, agent_index, obs, conn, action, reward, nobs, nconn, done):
         index = self.mem_cntr % self.mem_size
 
-        for a_idx in range(self.n_agents):
-            self.obs_memory[a_idx][index] = obs[a_idx]
-            self.action_memory[a_idx][index] = actions[a_idx]
-            self.reward_memory[a_idx][index] = rewards[a_idx]
-            self.next_obs_memory[a_idx][index] = nobs[a_idx]
-            self.done_memory[a_idx][index] = dones[a_idx]
-            self.connected_with_memory[a_idx][index] = conns[a_idx]
-            self.next_connected_with_memory[a_idx][index] = nconns[a_idx]
+        self.obs_memory[index] = obs
+        self.action_memory[index] = action
+        self.reward_memory[index] = reward
+        self.next_obs_memory[index] = nobs
+        self.done_memory[index] = done
+        self.connected_with_memory[index] = conn
+        self.next_connected_with_memory[index] = nconn
+        self.agent_index_memory[index] = agent_index
 
         self.mem_cntr += 1
 
@@ -49,21 +42,13 @@ class GNNReplayBuffer:
         max_mem = min(self.mem_cntr, self.mem_size)
         batch = np.random.choice(max_mem, batch_size)
 
-        obs = []
-        nobs = []
-        action = []
-        reward = []
-        done = []
-        connected_with = []
-        next_connected_with = []
+        agent_index = self.agent_index_memory[batch]
+        obs = self.obs_memory[batch]
+        connected_with = self.connected_with_memory[batch]
+        action = self.action_memory[batch]
+        reward = self.reward_memory[batch]
+        nobs = self.next_obs_memory[batch]
+        next_connected_with = self.next_connected_with_memory[batch]
+        done = self.done_memory[batch] = self.done_memory[batch]
 
-        for i in range(self.n_agents):
-            obs.append(self.obs_memory[i][batch])
-            nobs.append(self.next_obs_memory[i][batch])
-            action.append(self.action_memory[i][batch])
-            reward.append(self.reward_memory[i][batch])
-            done.append(self.done_memory[i][batch])
-            connected_with.append(self.connected_with_memory[i][batch])
-            next_connected_with.append(self.next_connected_with_memory[i][batch])
-
-        return obs, connected_with, action, reward, nobs, next_connected_with, done
+        return agent_index, obs, connected_with, action, reward, nobs, next_connected_with, done

@@ -34,8 +34,8 @@ if __name__ == "__main__":
 
     # for run in runs:
     # read file
-    run = 28
-    file = f"C:/Users/Jakob Dybdahl/source/repos/msc-project/msc_project/scripts/results/TrafficJunctionContinuous6-v0/ddpg/debug/run{run}/results.csv"
+    run = 7
+    file = f"C:/Users/Jakob Dybdahl/source/repos/msc-project/msc_project/scripts/results/TrafficJunctionContinuous6-v0/ddpg/pure_ddpg/run{run}/results.csv"
     header_names = "success_rate,num_timeout,num_collision,epoch,average_reward,std_reward,max_reward,min_reward,average_test_reward,std_test_reward,max_test_reward,min_test_reward,steps,test_steps,total_env_steps,total_episodes,time".split(
         ","
     )
