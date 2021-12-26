@@ -1,4 +1,5 @@
 import sys
+from os import system
 
 import numpy as np
 import torch as T
@@ -162,6 +163,8 @@ class TJCRunner(BaseRunner):
 
         result = "SUCCESS" if ep_result["success"] else "FAILED"
         print(f"\t{result} \tCollisions = {ep_result['num_collisions']} \tScore = {ep_result['sum_reward']}")
+
+        sys.stdout.flush()
 
         sys.stdout.flush()
 

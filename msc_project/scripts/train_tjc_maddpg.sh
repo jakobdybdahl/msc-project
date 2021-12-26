@@ -6,7 +6,7 @@ env="tjc_gym:TrafficJunctionContinuous6-v0"
 buffer_size=1000000
 hidden_size1=400
 hidden_size2=300
-lr_actor=0.0001
+lr_actor=0.001
 lr_critic=0.001
 weight_decay=0
 tau=0.001
@@ -30,7 +30,7 @@ fov_radius=3
 
 echo "Env is ${env} and algo is ${algo}"
 
-seeds=(1 2 3 4 5)
+seeds=(1)
 for seed in "${seeds[@]}"
 do
   echo "Running experiment with seed = ${seed}"
@@ -38,8 +38,8 @@ do
   python ./train/train_tjc.py \
   --algorithm_name ${algo} \
   --experiment_name ${experiment} \
-  --env_name ${env} \
   --seed ${seed} \
+  --env_name ${env} \
   ${render:+--render "$render"} \
   --buffer_size ${buffer_size} \
   --hidden_size1 ${hidden_size1} \
@@ -54,9 +54,12 @@ do
   --act_noise_std_start ${act_noise_std_start} \
   --act_noise_std_min ${act_noise_std_min} \
   --act_noise_decay_end_step ${act_noise_decay_end_step} \
-  --max_episode_length ${max_episode_length} \
+  --max_agent_episode_steps ${max_agent_episode_steps} \
   --actor_train_interval_step ${actor_train_interval_step} \
   --train_interval ${train_interval} \
+  --episodes_per_epoch ${episodes_per_epoch} \
+  --epochs ${epochs} \
+  --num_eval_episodes ${num_eval_episodes} \
   --save_interval ${save_interval} \
   --step_cost_factor ${step_cost_factor} \
   --collision_cost ${collision_cost} \
