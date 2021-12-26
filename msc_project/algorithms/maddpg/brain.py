@@ -23,12 +23,12 @@ class Brain:
         self._gamma = discount_gamma
 
         # actor networks
-        self._actor_local = ActorNetwork(observation_size, action_size).to(device)
-        self._actor_target = ActorNetwork(observation_size, action_size).to(device)
+        self._actor_local = ActorNetwork(observation_size, action_size, "actor").to(device)
+        self._actor_target = ActorNetwork(observation_size, action_size, "actor_target").to(device)
 
         # critic networks
-        self._critic_local = CriticNetwork(observation_size * agent_count, action_size * agent_count).to(device)
-        self._critic_target = CriticNetwork(observation_size * agent_count, action_size * agent_count).to(device)
+        self._critic_local = CriticNetwork(observation_size * agent_count, action_size * agent_count, "critic").to(device)
+        self._critic_target = CriticNetwork(observation_size * agent_count, action_size * agent_count, "critic_target").to(device)
 
         # optimizers
         self._actor_optimizer = optim.Adam(self._actor_local.parameters(), lr=alpha)
@@ -60,7 +60,8 @@ class Brain:
             actor.eval()
 
         action_values = actor(observation)
-
+        
+        noise = 0
         if explore and self.noise is not None:
             noise = torch.tensor(self.noise()).to(self.device)
 
@@ -108,6 +109,18 @@ class Brain:
     def update_targets(self):
         self._soft_update(self._actor_local, self._actor_target, self._soft_update_tau)
         self._soft_update(self._critic_local, self._critic_target, self._soft_update_tau)
+
+    def save_models(self, path=None):
+        self._actor_local.save_checkpoint(path)
+        self._actor_target.save_checkpoint(path)
+        self._critic_local.save_checkpoint(path)
+        self._critic_target.save_checkpoint(path)
+
+    def load_models(self, path=None):
+        self._actor_local.load_checkpoint(path)
+        self._actor_target.load_checkpoint(path)
+        self._critic_local.load_checkpoint(path)
+        self._critic_target.load_checkpoint(path)
 
     @staticmethod
     def _soft_update(local_model, target_model, tau):
