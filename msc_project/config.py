@@ -4,8 +4,8 @@ import argparse
 def get_config():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--algorithm_name", type=str, default="ddpg", choices=["maddpg", "ddpg"])
-    parser.add_argument("--experiment_name", type=str, default="debug")
+    parser.add_argument("--algorithm_name", type=str, default="gnn", choices=["maddpg", "ddpg", "gnn"])
+    parser.add_argument("--experiment_name", type=str, default="no-self-loop")
     parser.add_argument("--seed", type=int, default=2, help="random seed for numpy/torch")
 
     # env
@@ -20,7 +20,7 @@ def get_config():
 
     # buffer
     parser.add_argument(
-        "--buffer_size", type=int, default=2000000, help="Max # of transitions that replay buffer can contain"
+        "--buffer_size", type=int, default=1000000, help="Max # of transitions that replay buffer can contain"
     )
 
     # network
@@ -49,7 +49,7 @@ def get_config():
     parser.add_argument(
         "--num_random_episodes",
         type=int,
-        default=0,
+        default=1,
         help="Number of episodes to add to buffer with purely random actions",
     )
     parser.add_argument(
@@ -58,7 +58,7 @@ def get_config():
     parser.add_argument(
         "--act_noise_std_min",
         type=float,
-        default=0.0,
+        default=0.01,
         help="Min value for action noise standard deviation. Decays to this value at 'act_noise_decay_end_step'",
     )
     parser.add_argument(
@@ -76,8 +76,13 @@ def get_config():
         "--actor_train_interval_step", type=int, default=1, help="After how many critic updates actor should be updated"
     )
     parser.add_argument("--train_interval", type=int, default=1, help="Number of steps between updates to actor/critic")
-    parser.add_argument("--episodes_per_epoch", type=int, default=15, help="Number of episodes in each epoch")
+    parser.add_argument("--episodes_per_epoch", type=int, default=20, help="Number of episodes in each epoch")
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to run and train agent")
+
+    # TODO use?
+    parser.add_argument(
+        "--min_reward", type=float, default=-10000, help="Minimum reward before an episode is terminated"
+    )
 
     # evaulate parameters
     parser.add_argument(

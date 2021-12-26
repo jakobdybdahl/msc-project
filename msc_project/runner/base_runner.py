@@ -54,6 +54,8 @@ class BaseRunner(object):
             from msc_project.algorithms.ddpg.ddpg_agent import DDPGAgent as Agent
         elif self.algorithm_name == "maddpg":
             from msc_project.algorithms.maddpg.maddpg_agent import MADDPGAgent as Agent
+        elif self.algorithm_name == "gnn":
+            from msc_project.algorithms.gnn.gnn_agent import GNNAgent as Agent
         else:
             raise NotImplementedError
 

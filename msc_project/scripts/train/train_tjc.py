@@ -7,6 +7,7 @@ import gym
 import numpy as np
 import setproctitle
 import torch as T
+import torch_geometric
 from msc_project.config import get_config
 from msc_project.runner.tjc_runner import TJCRunner
 from msc_project.utils.logger import EpochLogger
@@ -88,9 +89,10 @@ def main(args):
     )
 
     # set seeds
-    T.manual_seed(all_args.seed)
-    T.cuda.manual_seed(all_args.seed)
-    np.random.seed(all_args.seed)
+    # T.manual_seed(all_args.seed)
+    # T.cuda.manual_seed(all_args.seed)
+    # np.random.seed(all_args.seed)
+    torch_geometric.seed_everything(all_args.seed)
 
     # create environment. act_space is to parse to policy_config
     env, act_space = make_train_env(all_args)

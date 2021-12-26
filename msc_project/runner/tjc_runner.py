@@ -16,6 +16,7 @@ class TJCRunner(BaseRunner):
         num_collisions = 0
         num_unique_collisions = 0
         num_steps = 0
+        minimum_reward_reached = False
 
         car_steps = np.zeros(self.num_agents)
         car_rewards = np.zeros(self.num_agents)
@@ -29,9 +30,9 @@ class TJCRunner(BaseRunner):
         while not all(dones):
             if render:
                 env.render()
-
+ 
             if warmup:
-                actions = self.agent.get_random_actions(obs)
+                actions = self.agent.get_random_actions()
             else:
                 actions = self.agent.get_actions(obs, explore=explore)
 
@@ -56,11 +57,18 @@ class TJCRunner(BaseRunner):
             car_steps += info["took_step"]
             num_steps += 1
 
+            if self.args.min_reward != None:
+                if sum(car_rewards) < self.args.min_reward:
+                    # terminate episode
+                    dones = [True] * self.num_agents
+                    minimum_reward_reached = True
+
         ep_info["env_steps"] = num_steps
         ep_info["agent_rewards"] = car_rewards
         ep_info["agent_steps"] = car_steps
         ep_info["collisions"] = num_collisions
         ep_info["unique_collisions"] = num_unique_collisions
+        ep_info["minimum_reward_reached"] = minimum_reward_reached
 
         return ep_info
 
@@ -68,16 +76,19 @@ class TJCRunner(BaseRunner):
         num_success = 0
         num_timeout = 0
         num_collision = 0
+        num_minimum_reward_reached = 0
 
         for _ in range(self.num_eval_episodes):
             ep_info = self.run_episode(explore=False, training_episode=False)
 
             timeout = (ep_info["agent_steps"] >= self.max_agent_episode_steps).any()
             collision = ep_info["collisions"].any()
+            minimum_reward_reached = ep_info["minimum_reward_reached"]
 
+            num_minimum_reward_reached += 1 if minimum_reward_reached else 0
             num_timeout += 1 if timeout else 0
             num_collision += 1 if collision else 0
-            num_success += 1 if not timeout and not collision else 0
+            num_success += 1 if not timeout and not collision and not minimum_reward_reached else 0
 
             mean_steps = np.mean(ep_info["agent_steps"])
             sum_reward = np.sum(ep_info["agent_rewards"])
@@ -90,6 +101,7 @@ class TJCRunner(BaseRunner):
         self.logger.log("success_rate", success_rate)
         self.logger.log("num_timeout", num_timeout)
         self.logger.log("num_collision", num_collision)
+        self.logger.log("num_minimum_reward_reached", num_minimum_reward_reached)
 
     def log(self, ep_info):
         mean_steps = np.mean(ep_info["agent_steps"])

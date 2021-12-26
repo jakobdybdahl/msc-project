@@ -27,16 +27,17 @@ def plot(x, scores, running_avg_size=10, fig_file=None, title=None):
 if __name__ == "__main__":
     # read file
     runs = [1, 2, 3, 4, 5]
-    dist_dir = "dist"
-
-    if not os.path.exists(dist_dir):
-        os.makedirs(dist_dir)
 
     # for run in runs:
     # read file
-    run = 7
-    file = f"C:/Users/Jakob Dybdahl/source/repos/msc-project/msc_project/scripts/results/TrafficJunctionContinuous6-v0/ddpg/pure_ddpg/run{run}/results.csv"
-    header_names = "success_rate,num_timeout,num_collision,epoch,average_reward,std_reward,max_reward,min_reward,average_test_reward,std_test_reward,max_test_reward,min_test_reward,steps,test_steps,total_env_steps,total_episodes,time".split(
+    run = 1
+
+    dist_dir = f"dist/gnn_run_{run}"
+    if not os.path.exists(dist_dir):
+        os.makedirs(dist_dir)
+
+    file = f"C:/Users/Jakob Dybdahl/source/repos/msc-project/msc_project/scripts/results/TrafficJunctionContinuous6-v0/gnn/first-gnn-run/run{run}/results.csv"
+    header_names = "success_rate,num_timeout,num_collision,num_minimum_reward_reached,epoch,average_reward,std_reward,max_reward,min_reward,average_test_reward,std_test_reward,max_test_reward,min_test_reward,steps,test_steps,total_env_steps,total_episodes,time".split(
         ","
     )
     data = np.genfromtxt(
@@ -53,6 +54,7 @@ if __name__ == "__main__":
         "average_test_reward",
         "test_steps",
         "std_test_reward",
+        "num_minimum_reward_reached",
     ]
 
     for name in names:
@@ -61,5 +63,5 @@ if __name__ == "__main__":
         scores = data[:, header_names.index(name)]
 
         # plot
-        out_file = f"{dist_dir}/run{run}_{name}.png"
+        out_file = f"{dist_dir}/{name}.png"
         plot(x, scores, fig_file=out_file, running_avg_size=1, title=name)
