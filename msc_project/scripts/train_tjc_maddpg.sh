@@ -1,8 +1,8 @@
 #!/bin/sh
 algo="maddpg"
-experiment="pure_maddpg"
-env="tjc_gym:TrafficJunctionContinuous6-v1"
-# render=0
+experiment="pure_maddpg_v0"
+env="tjc_gym:TrafficJunctionContinuous6-v0"
+# render=True
 buffer_size=1000000
 hidden_size1=400
 hidden_size2=300
@@ -14,14 +14,17 @@ batch_size=128
 gamma=0.99
 num_random_episodes=1
 act_noise_std_start=0.3
-act_noise_std_min=0.0
-act_noise_decay_end_step=200000
-max_episode_length=500
+act_noise_std_min=0.01
+act_noise_decay_end_step=300000
+max_agent_episode_steps=500
 actor_train_interval_step=1
-train_interval=2
-save_interval=100
+train_interval=1
+episodes_per_epoch=20
+epochs=100
+num_eval_episodes=100
+save_interval=10
 step_cost_factor=-0.01
-collision_cost=-100
+collision_cost=-10
 arrive_prob=0.05
 fov_radius=3
 

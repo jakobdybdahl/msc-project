@@ -18,7 +18,7 @@ class MADDPGAgent:
         self.act_space = policy_info["act_space"]
         self.obs_dim = policy_info["obs_space"].shape[0]
         self.act_dims = policy_info["act_space"].shape[0]
-        self.agent_count = policy_info["num_agents"]
+        self.n_agents = policy_info["num_agents"]
 
         decay = (args.act_noise_std_start - args.act_noise_std_min) / args.act_noise_decay_end_step
         self.noise = GaussianActionNoise(
@@ -26,7 +26,7 @@ class MADDPGAgent:
         )
 
         self.brain = Brain(
-            agent_count=self.agent_count,
+            agent_count=self.n_agents,
             observation_size=self.obs_dim,
             action_size=self.act_dims,
             alpha=args.lr_actor,
@@ -51,6 +51,8 @@ class MADDPGAgent:
         self.t_step = 0
 
     def store_transistion(self, obs, actions, rewards, next_obs, dones, info):
+        obs = obs["fov"]
+        next_obs = next_obs["fov"]
         self.memory.store_transition(obs, actions, rewards, next_obs, dones)
 
     def act_torch(self, obs, target, explore=True, train=False):
@@ -62,7 +64,7 @@ class MADDPGAgent:
         """
         actions = [
             self.brain.act(obs[:, i], target, explore, train)
-            for i in range(self.agent_count)
+            for i in range(self.n_agents)
         ]
 
         actions = torch.stack(actions).transpose(1, 0)
@@ -70,6 +72,7 @@ class MADDPGAgent:
         return torch.clamp(actions, 0, 1)
 
     def get_actions(self, obs, explore=True, target=False, ):
+        obs = obs["fov"]
         obs = torch.from_numpy(obs).float().\
             to(self.device).unsqueeze(0)
 
@@ -81,8 +84,8 @@ class MADDPGAgent:
 
         return actions.flatten()
 
-    def get_random_actions(self, obs):
-        return [self.act_space.sample()[0] for _ in range(len(obs))]
+    def get_random_actions(self):
+         return [self.act_space.sample()[0] for _ in range(self.n_agents)]
 
     def reset(self):
         self.brain.reset()
@@ -110,7 +113,7 @@ class MADDPGAgent:
             train=True
         ).contiguous()
 
-        for i in range(self.agent_count):
+        for i in range(self.n_agents):
             # update critics
             self.brain.update_critic(
                 rewards[:, i].unsqueeze(-1), dones[:, i].unsqueeze(-1),

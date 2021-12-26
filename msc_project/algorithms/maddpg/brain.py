@@ -60,7 +60,7 @@ class Brain:
             actor.eval()
 
         action_values = actor(observation)
-
+        noise = 0
         if explore and self.noise is not None:
             noise = torch.tensor(self.noise()).to(self.device)
 
