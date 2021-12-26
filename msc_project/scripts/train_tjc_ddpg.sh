@@ -1,9 +1,9 @@
 #!/bin/sh
 
 algo="ddpg"
-experiment="pure_ddpg"
+experiment="default-tjc-env"
 env="tjc_gym:TrafficJunctionContinuous6-v0"
-# render=0
+render=True
 buffer_size=1000000
 hidden_size1=400
 hidden_size2=300
@@ -15,18 +15,17 @@ batch_size=128
 gamma=0.99
 num_random_episodes=1
 act_noise_std_start=0.3
-act_noise_std_min=0.0
-act_noise_decay_end_step=200000
+act_noise_std_min=0.01
+act_noise_decay_end_step=300000
 max_agent_episode_steps=500
 actor_train_interval_step=1
 train_interval=1
-episodes_per_epoch=15
-epochs=2
+episodes_per_epoch=10
+epochs=100
 num_eval_episodes=10
 save_interval=1
-running_avg_size=50
 step_cost_factor=-0.01
-collision_cost=-100
+collision_cost=-10
 arrive_prob=0.05
 fov_radius=3
 
@@ -68,7 +67,6 @@ do
   --epochs ${epochs} \
   --num_eval_episodes ${num_eval_episodes} \
   --save_interval ${save_interval} \
-  --running_avg_size ${running_avg_size} \
   --step_cost_factor ${step_cost_factor} \
   --collision_cost ${collision_cost} \
   --arrive_prob ${arrive_prob} \

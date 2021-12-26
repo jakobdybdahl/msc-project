@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import torch as T
 from msc_project.runner.base_runner import BaseRunner
@@ -7,9 +9,23 @@ class TJCRunner(BaseRunner):
     def __init__(self, config) -> None:
         super().__init__(config)
 
+        self.best_success_rate = -np.inf
+
+        # init values to store for epoch logging
+        self._init_train_values()
+
         # warmup
         num_warmup_eps = max((int(self.batch_size // self.max_agent_episode_steps) + 1, self.args.num_random_episodes))
         self.warmup(num_warmup_eps)
+
+    def _init_train_values(self):
+        self.train_num_success = 0
+        self.train_num_timeout_failures = 0
+        self.train_num_collision_failures = 0
+        self.train_num_minimum_reward_reached = 0
+
+        self.train_total_collisions = 0
+        self.train_total_timeouts = 0
 
     def run_episode(self, explore=True, training_episode=True, warmup=False):
         ep_info = {}
@@ -30,7 +46,7 @@ class TJCRunner(BaseRunner):
         while not all(dones):
             if render:
                 env.render()
- 
+
             if warmup:
                 actions = self.agent.get_random_actions()
             else:
@@ -74,46 +90,80 @@ class TJCRunner(BaseRunner):
 
     def eval_agent(self):
         num_success = 0
-        num_timeout = 0
-        num_collision = 0
+        num_timeout_failures = 0
+        num_collision_failures = 0
         num_minimum_reward_reached = 0
+
+        total_collisions = 0
+        total_timeouts = 0
 
         for _ in range(self.num_eval_episodes):
             ep_info = self.run_episode(explore=False, training_episode=False)
 
-            timeout = (ep_info["agent_steps"] >= self.max_agent_episode_steps).any()
-            collision = ep_info["collisions"].any()
-            minimum_reward_reached = ep_info["minimum_reward_reached"]
+            result = self._get_ep_result(ep_info)
 
-            num_minimum_reward_reached += 1 if minimum_reward_reached else 0
-            num_timeout += 1 if timeout else 0
-            num_collision += 1 if collision else 0
-            num_success += 1 if not timeout and not collision and not minimum_reward_reached else 0
+            num_minimum_reward_reached += 1 if result["minimum_reward_reached"] else 0
+            num_timeout_failures += 1 if result["num_timeouts"] > 0 else 0
+            num_collision_failures += 1 if result["num_collisions"] > 0 else 0
+            num_success += 1 if result["success"] else 0
 
-            mean_steps = np.mean(ep_info["agent_steps"])
-            sum_reward = np.sum(ep_info["agent_rewards"])
+            total_collisions += result["num_collisions"]
+            total_timeouts += result["num_timeouts"]
+
+            mean_steps = result["mean_agent_steps"]
+            sum_reward = result["sum_reward"]
             self.logger.store(test_steps=mean_steps, test_reward=sum_reward)
 
         success_rate = num_success / self.num_eval_episodes
 
-        # TODO compare with previous best score and save model if better
+        # check if better than previous and save if so
+        if success_rate > self.best_success_rate:
+            self.best_success_rate = success_rate
+            self.save_best()
 
         self.logger.log("success_rate", success_rate)
-        self.logger.log("num_timeout", num_timeout)
-        self.logger.log("num_collision", num_collision)
+        self.logger.log("num_timeout_failures", num_timeout_failures)
+        self.logger.log("num_collision_failures", num_collision_failures)
         self.logger.log("num_minimum_reward_reached", num_minimum_reward_reached)
+        self.logger.log("total_collisions", total_collisions)
+        self.logger.log("total_timeouts", total_timeouts)
 
-    def log(self, ep_info):
-        mean_steps = np.mean(ep_info["agent_steps"])
-        sum_reward = np.sum(ep_info["agent_rewards"])
+    def log_epoch_info(self):
+        success_rate = self.train_num_success / self.episodes_per_epoch
 
-        self.logger.store(steps=mean_steps, reward=sum_reward)
+        self.logger.log("train_success_rate", success_rate)
+        self.logger.log("train_num_timeout_failures", self.train_num_timeout_failures)
+        self.logger.log("train_num_collisions_failures", self.train_num_collision_failures)
+        self.logger.log("train_num_minimum_reward_reached", self.train_num_minimum_reward_reached)
+        self.logger.log("train_total_collisions", self.train_total_collisions)
+        self.logger.log("train_total_timeouts", self.train_total_timeouts)
+        self.logger.log("agent_noise_std", self.agent.noise.std)
 
-        # TODO move into logger?
-        print(f"Episode {self.num_episodes}. {ep_info['env_steps']} steps. Noise std: {self.agent.noise.std}")
+        # reset values
+        self._init_train_values()
 
-        result = "SUCCESS" if not np.any(ep_info["collisions"]) else "FAILED"
-        print(f"\t{result} \tCollisions = {ep_info['collisions']} \tScore = {sum_reward}")
+    def store_train_info(self, ep_info):
+        result = self._get_ep_result(ep_info)
+        self.logger.store(steps=result["mean_agent_steps"], reward=result["sum_reward"])
+
+        # store local
+        self.train_num_minimum_reward_reached += 1 if result["minimum_reward_reached"] else 0
+        self.train_num_timeout_failures += 1 if result["num_timeouts"] > 0 else 0
+        self.train_num_collision_failures += 1 if result["num_collisions"] > 0 else 0
+        self.train_num_success += 1 if result["success"] else 0
+
+        self.train_total_collisions += result["num_collisions"]
+        self.train_total_timeouts += result["num_timeouts"]
+
+    def print_between_train_ep(self, ep_info):
+        ep_result = self._get_ep_result(ep_info)
+
+        print(f"Episode {self.num_episodes}. {ep_result['env_steps']} steps. Noise std: {self.agent.noise.std}")
+
+        result = "SUCCESS" if ep_result["success"] else "FAILED"
+        print(f"\t{result} \tCollisions = {ep_result['num_collisions']} \tScore = {ep_result['sum_reward']}")
+
+        sys.stdout.flush()
 
     def warmup(self, num_warmup_eps):
         warmup_rewards = []
@@ -123,3 +173,25 @@ class TJCRunner(BaseRunner):
             warmup_rewards.append(np.sum(ep_info["agent_rewards"]))
         warmup_reward = np.mean(warmup_rewards)
         print(f"Average reward during warm up: {warmup_reward}")
+
+    def _get_ep_result(self, ep_info):
+        num_timeouts = (ep_info["agent_steps"] >= self.max_agent_episode_steps).sum()
+        num_collisions = ep_info["collisions"].sum()
+        sum_reward = ep_info["agent_rewards"].sum()
+        mean_agent_steps = ep_info["agent_steps"].mean()
+
+        minimum_reward_reached_failure = ep_info["minimum_reward_reached"]
+        timeout_failure = num_timeouts > 0
+        collision_failure = num_collisions > 0
+
+        success = not minimum_reward_reached_failure and not timeout_failure and not collision_failure
+
+        return {
+            "success": success,
+            "num_timeouts": num_timeouts,
+            "num_collisions": num_collisions,
+            "sum_reward": sum_reward,
+            "minimum_reward_reached": minimum_reward_reached_failure,
+            "env_steps": ep_info["env_steps"],
+            "mean_agent_steps": mean_agent_steps,
+        }

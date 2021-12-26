@@ -1,174 +1,15 @@
-import os
-import time
-from pathlib import Path
-
-import gym
 import numpy as np
 import torch as T
-import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 from msc_project.algorithms.gnn.buffer import GNNReplayBuffer
-from msc_project.config import get_config
+from msc_project.algorithms.gnn.networks import ActorNetwork, CriticNetwork
 from msc_project.utils.noise import GaussianActionNoise
 from torch_geometric.data import Data
 from torch_geometric.data.batch import Batch
-from torch_geometric.nn import GATv2Conv, GCNConv
-
-
-class CriticNetwork(nn.Module):
-    def __init__(self, beta, input_dims, fc1_dims, fc2_dims, n_actions, name, device, use_gat):
-        super(CriticNetwork, self).__init__()
-        self.input_dims = input_dims
-        self.fc1_dims = fc1_dims
-        self.fc2_dims = fc2_dims
-        self.n_actions = n_actions
-
-        self.name = name
-
-        # TODO review this setting of the input channels for the GCNConv layer
-        self.hidden_dim = input_dims * 2
-
-        if not use_gat:
-            self.conv1 = GCNConv(self.input_dims, self.hidden_dim)
-        else:
-            self.conv1 = GATv2Conv(self.input_dims, self.hidden_dim, share_weights=True)
-
-        self.fc1 = nn.Linear(self.hidden_dim, self.fc1_dims)
-        self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
-
-        self.bn1 = nn.LayerNorm(self.fc1_dims)
-        self.bn2 = nn.LayerNorm(self.fc2_dims)
-
-        self.action_value = nn.Linear(self.n_actions, self.fc2_dims)
-
-        self.q = nn.Linear(self.fc2_dims, 1)
-
-        f1 = 1.0 / np.sqrt(self.fc1.weight.data.size()[0])
-        self.fc1.weight.data.uniform_(-f1, f1)
-        self.fc1.bias.data.uniform_(-f1, f1)
-
-        f2 = 1.0 / np.sqrt(self.fc2.weight.data.size()[0])
-        self.fc2.weight.data.uniform_(-f2, f2)
-        self.fc2.bias.data.uniform_(-f2, f2)
-
-        f3 = 0.003
-        self.q.weight.data.uniform_(-f3, f3)
-        self.q.bias.data.uniform_(-f3, f3)
-
-        f4 = 1.0 / np.sqrt(self.action_value.weight.data.size()[0])
-        self.action_value.weight.data.uniform_(-f4, f4)
-        self.action_value.bias.data.uniform_(-f4, f4)
-
-        self.optimizer = optim.Adam(self.parameters(), lr=beta, weight_decay=0.01)
-
-        self.device = device
-        self.to(self.device)
-
-    def forward(self, data, action, agent_mask):
-        x = self.conv1(data.x, data.edge_index)
-        x = x[agent_mask, :]
-        x = F.relu(x)
-
-        state_value = self.fc1(x)
-        state_value = self.bn1(state_value)
-        state_value = F.relu(state_value)
-        state_value = self.fc2(state_value)
-        state_value = self.bn2(state_value)
-
-        action_value = self.action_value(action)
-        state_action_value = F.relu(T.add(state_value, action_value))
-
-        state_action_value = self.q(state_action_value)
-
-        return state_action_value
-
-    def save_checkpoint(self, path):
-        file = os.path.join(path, self.name)
-        T.save(self.state_dict(), file)
-
-    def load_checkpoint(self, path):
-        file = os.path.join(path, self.name)
-        self.load_state_dict(T.load(file))
-
-    def save_best(self, path):
-        file = os.path.join(path, self.name + "_best")
-        T.save(self.state_dict(), file)
-
-
-class ActorNetwork(nn.Module):
-    def __init__(self, alpha, input_dims, fc1_dims, fc2_dims, n_actions, name, device, use_gat=False):
-        super(ActorNetwork, self).__init__()
-        self.input_dims = input_dims
-        self.fc1_dims = fc1_dims
-        self.fc2_dims = fc2_dims
-        self.n_actions = n_actions
-
-        self.name = name
-
-        # TODO review this setting of the input channels for the GCNConv layer
-        self.hidden_dim = input_dims * 2
-
-        if not use_gat:
-            self.conv1 = GCNConv(self.input_dims, self.hidden_dim)
-        else:
-            self.conv1 = GATv2Conv(self.input_dims, self.hidden_dim, share_weights=True)
-
-        self.fc1 = nn.Linear(self.hidden_dim, self.fc1_dims)
-        self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
-
-        self.bn1 = nn.LayerNorm(self.fc1_dims)
-        self.bn2 = nn.LayerNorm(self.fc2_dims)
-
-        self.mu = nn.Linear(self.fc2_dims, self.n_actions)
-
-        f2 = 1.0 / np.sqrt(self.fc2.weight.data.size()[0])
-        self.fc2.weight.data.uniform_(-f2, f2)
-        self.fc2.bias.data.uniform_(-f2, f2)
-
-        f1 = 1.0 / np.sqrt(self.fc1.weight.data.size()[0])
-        self.fc1.weight.data.uniform_(-f1, f1)
-        self.fc1.bias.data.uniform_(-f1, f1)
-
-        f3 = 0.003
-        self.mu.weight.data.uniform_(-f3, f3)
-        self.mu.bias.data.uniform_(-f3, f3)
-
-        self.optimizer = optim.Adam(self.parameters(), lr=alpha)
-
-        self.device = device
-        self.to(self.device)
-
-    def forward(self, data, agent_mask):
-        x = self.conv1(data.x, data.edge_index)
-        x = x[agent_mask, :]
-        x = F.relu(x)
-
-        x = self.fc1(x)
-        x = self.bn1(x)
-        x = F.relu(x)
-        x = self.fc2(x)
-        x = self.bn2(x)
-        x = F.relu(x)
-        x = T.sigmoid(self.mu(x))
-
-        return x
-
-    def save_checkpoint(self, path):
-        file = os.path.join(path, self.name)
-        T.save(self.state_dict(), file)
-
-    def load_checkpoint(self, path):
-        file = os.path.join(path, self.name)
-        self.load_state_dict(T.load(file))
-
-    def save_best(self, path):
-        file = os.path.join(path, self.name + "_best")
-        T.save(self.state_dict(), file)
 
 
 class GNNAgent(object):
-    def __init__(self, args, policy_info, device, use_gat=False) -> None:
+    def __init__(self, args, policy_info, device) -> None:
         self.device = device
 
         self.gamma = args.gamma
@@ -177,6 +18,7 @@ class GNNAgent(object):
         self.beta = args.lr_critic
         self.fc1_dimes = args.hidden_size1
         self.fc2_dims = args.hidden_size2
+        self.use_gat = args.use_gat
 
         self.obs_space = policy_info["obs_space"]
         self.act_space = policy_info["act_space"]
@@ -195,17 +37,31 @@ class GNNAgent(object):
         )
 
         self.actor = ActorNetwork(
-            self.alpha, self.obs_dim, self.fc1_dimes, self.fc2_dims, self.act_dim, "actor", self.device, use_gat
+            self.alpha, self.obs_dim, self.fc1_dimes, self.fc2_dims, self.act_dim, "actor", self.device, self.use_gat
         )
         self.critic = CriticNetwork(
-            self.beta, self.obs_dim, self.fc1_dimes, self.fc2_dims, self.act_dim, "critic", self.device, use_gat
+            self.beta, self.obs_dim, self.fc1_dimes, self.fc2_dims, self.act_dim, "critic", self.device, self.use_gat
         )
 
         self.target_actor = ActorNetwork(
-            self.alpha, self.obs_dim, self.fc1_dimes, self.fc2_dims, self.act_dim, "target_actor", self.device, use_gat
+            self.alpha,
+            self.obs_dim,
+            self.fc1_dimes,
+            self.fc2_dims,
+            self.act_dim,
+            "target_actor",
+            self.device,
+            self.use_gat,
         )
         self.target_critic = CriticNetwork(
-            self.beta, self.obs_dim, self.fc1_dimes, self.fc2_dims, self.act_dim, "target_critic", self.device, use_gat
+            self.beta,
+            self.obs_dim,
+            self.fc1_dimes,
+            self.fc2_dims,
+            self.act_dim,
+            "target_critic",
+            self.device,
+            self.use_gat,
         )
 
         self.update_network_parameters(tau=1)
@@ -227,7 +83,7 @@ class GNNAgent(object):
 
     def get_actions(self, obs, explore=True):
         # TODO how to remove this knowledge to the environment?
-        fov, who_in_fov = obs[0], obs[1]
+        fov, who_in_fov = obs.fov, obs.who_in_fov
 
         actions = []
 
@@ -257,10 +113,10 @@ class GNNAgent(object):
 
     def store_transistion(self, obs, acts, rewards, nobs, dones, info):
         # TODO remove knowledge on the environment
-        fovs = obs[0]
-        comms = obs[1]
-        nfovs = nobs[0]
-        ncomms = nobs[1]
+        fovs = obs.fov
+        comms = obs.who_in_fov
+        nfovs = nobs.fov
+        ncomms = nobs.who_in_fov
 
         for agent_i in range(self.n_agents):
             done = dones[agent_i] or not info["cars_on_road"][agent_i]
@@ -363,192 +219,3 @@ class GNNAgent(object):
 
         self.target_actor.load_state_dict(actor_state_dict)
         self.target_critic.load_state_dict(critic_state_dict)
-
-
-def train():
-    render = True
-    explore = True
-
-    run_dir = Path(os.path.split(os.path.dirname(os.path.abspath(__file__)))[0] + "/results") / "models"
-
-    if not os.path.exists(str(run_dir)):
-        os.makedirs(str(run_dir))
-
-    for ep_i in range(1000):
-        ep_info = {}
-        num_collisions = 0
-        num_unique_collisions = 0
-        num_steps = 0
-
-        car_steps = np.zeros(num_agents)
-        car_rewards = np.zeros(num_agents)
-
-        obs = env.reset()
-        dones = [False] * num_agents
-
-        while not all(dones):
-            if render:
-                env.render()
-
-            actions = agent.get_actions(obs, explore=explore)
-
-            nobs, rewards, dones, info = env.step(actions)
-
-            if explore:
-                agent.store_transistion(obs, actions, rewards, nobs, dones, info)
-
-            obs = nobs
-
-            # if (num_steps + 1) % 10 == 0:
-            agent.learn()
-
-            # update env info vars
-            car_rewards += rewards
-            num_collisions += info["collisions"]
-            num_unique_collisions += info["unique_collisions"]
-            car_steps += info["took_step"]
-            num_steps += 1
-
-            if sum(car_rewards) < -3000:
-                break
-
-        ep_info["env_steps"] = num_steps
-        ep_info["agent_rewards"] = car_rewards
-        ep_info["agent_steps"] = car_steps
-        ep_info["collisions"] = num_collisions
-        ep_info["unique_collisions"] = num_unique_collisions
-
-        mean_steps = np.mean(ep_info["agent_steps"])
-        sum_reward = np.sum(ep_info["agent_rewards"])
-
-        # TODO move into logger?
-        print(f"Episode {ep_i}. {ep_info['env_steps']} steps. Noise std: {agent.noise.std}")
-
-        result = "SUCCESS" if not np.any(ep_info["collisions"]) else "FAILED"
-        print(f"\t{result} \tCollisions = {ep_info['collisions']} \tScore = {sum_reward}")
-
-        if (ep_i + 1) % 5 == 0:
-
-            agent.save_models(str(run_dir))
-
-
-def playground():
-    obs = env.reset()
-
-    for i in range(agent.batch_size):
-        env.render()
-        acts = agent.get_random_actions()
-        nobs, rewards, dones, info = env.step(acts)
-
-        fovs = obs[0]
-        nfovs = nobs[0]
-
-        comms = obs[1]
-        ncomms = nobs[1]
-
-        agent.store_transistion(obs, acts, rewards, nobs, dones, info)
-
-        obs = nobs
-
-    batch = agent.memory.sample_buffer(64)
-
-    agent_idx, fovs, comms, action, reward, nfovs, ncomms, done = batch
-
-    fovs = T.tensor(fovs, dtype=T.float).to(device)
-    nfovs = T.tensor(nfovs, dtype=T.float).to(device)
-
-    data_list = []
-    ndata_list = []
-
-    for b in range(len(agent_idx)):
-        comm = comms[b]
-        ncomm = ncomms[b]
-
-        edge_index = agent._get_edge_index(comm)
-        n_edge_index = agent._get_edge_index(ncomm)
-
-        data_list.append(Data(x=fovs[b], edge_index=edge_index))
-        ndata_list.append(Data(x=nfovs[b], edge_index=n_edge_index))
-
-    batch = Batch.from_data_list(data_list).to(device)
-    nbatch = Batch.from_data_list(ndata_list).to(device)
-
-    mask = T.zeros_like(batch.batch, dtype=T.bool)
-
-    for i, a in enumerate(agent_idx):
-        mask[i * num_agents + a] = True
-
-    test = agent.actor.forward(batch, mask)
-
-    # x = test[mask, :]
-
-    print(agent_idx)
-    print(mask)
-
-    print("HELLO")
-
-    # obs = env.reset()
-    # acts = agent.get_random_actions()
-    # nobs, rewards, dones, info = env.step(acts)
-
-    # agent.store_transistion(obs, acts, rewards, nobs, dones, info)
-
-    # for i in range(agent.batch_size):
-    #     agent.store_transistion(obs, acts, rewards, nobs, dones, info)
-
-    # batch = agent.memory.sample_buffer(64)
-    # obs, connected_with, action, reward, nobs, next_connected_with, done = batch
-
-    # acts = agent.get_actions(nobs)
-
-    # fov, who_in_fov = nobs[0], nobs[1]
-
-    # edge_index = agent._get_edge_index(who_in_fov[0])
-    # x = T.tensor(fov, dtype=T.float)
-    # data = Data(x=x, edge_index=edge_index)
-
-    # print(data.num_node_features)
-
-    # agent.store_transistion()
-
-    # import matplotlib.pyplot as plt
-
-    # plt.figure(1, figsize=(14, 12))
-    # nx.draw(to_networkx(data), cmap=plt.get_cmap("Set1"), with_labels=True, node_size=75, linewidths=6)
-    # plt.show()
-
-    time.sleep(10000)
-
-
-if __name__ == "__main__":
-    seed = 1
-    device = T.device("cuda")
-
-    env = gym.make("tjc_gym:TrafficJunctionContinuous6-v0")
-    env.env.collision_cost = -10
-    env.env.step_cost = -0.01
-
-    env.seed(seed)
-
-    # set seeds
-    T.manual_seed(seed)
-    T.cuda.manual_seed(seed)
-    np.random.seed(seed)
-
-    num_agents = env.n_agents
-    policy_info = {
-        "obs_space": gym.spaces.flatten_space(env.observation_space[0]),
-        "act_space": env.action_space[0],
-        "num_agents": num_agents,
-    }
-
-    parser = get_config()
-    args = parser.parse_args()
-
-    args.buffer_size = int(5e5)
-
-    agent = GNNAgent(args, policy_info, device, use_gat=True)
-
-    train()
-
-    # playground()

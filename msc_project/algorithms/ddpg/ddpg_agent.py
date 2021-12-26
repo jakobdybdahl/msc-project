@@ -27,6 +27,8 @@ class DDPGAgent:
         self.obs_dim = policy_info["obs_space"].shape[0]
         self.act_dims = policy_info["act_space"].shape[0]
 
+        self.n_agents = policy_info["num_agents"]
+
         self.memory = ReplayBuffer(args.buffer_size, self.obs_dim, self.act_dims)
 
         decay = (args.act_noise_std_start - args.act_noise_std_min) / args.act_noise_decay_end_step
@@ -74,11 +76,14 @@ class DDPGAgent:
             device=device,
         )
 
-    def get_random_actions(self, obs):
-        return [self.act_space.sample()[0] for _ in range(len(obs))]
+    def get_random_actions(self):
+        return [self.act_space.sample()[0] for _ in range(self.n_agents)]
 
     def get_actions(self, obs, explore=True):
         self.actor.eval()
+
+        # TODO how to remove this knowledge to the environment observation?
+        obs = obs["fov"]
 
         obs = T.tensor(obs, dtype=T.float).to(self.device)
         mu = self.actor.forward(obs).to(self.device)
@@ -96,9 +101,12 @@ class DDPGAgent:
         return mu_prime.view(-1).cpu().detach().numpy()
 
     def store_transistion(self, obs, acts, rewards, nobs, dones, info):
-        for i in range(len(obs)):
+        # TODO remove knowledge on the environment
+        for i in range(len(obs["fov"])):
             done = dones[i] or not info["cars_on_road"][i]
-            self.memory.store_transition(obs[i], acts[i], rewards[i], nobs[i], done)
+            fov = obs["fov"][i]
+            nfov = nobs["fov"][i]
+            self.memory.store_transition(fov, acts[i], rewards[i], nfov, done)
 
     def save_models(self, path=None):
         self.actor.save_checkpoint(path)

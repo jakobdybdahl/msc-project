@@ -1,10 +1,8 @@
-import json
 import os
 import sys
 from pathlib import Path
 
 import gym
-import numpy as np
 import setproctitle
 import torch as T
 import torch_geometric
@@ -37,7 +35,7 @@ def make_train_env(args):
 
 def parse_args(args, parser):
     parser.add_argument("--step_cost_factor", type=float, default=-0.01)
-    parser.add_argument("--collision_cost", type=float, default=-100)
+    parser.add_argument("--collision_cost", type=float, default=-10)
     parser.add_argument("--arrive_prob", type=float, default=0.05)
     parser.add_argument("--fov_radius", type=int, default=3)
 
@@ -104,7 +102,7 @@ def main(args):
 
     # setup info for policies
     policy_info = {
-        "obs_space": gym.spaces.flatten_space(env.observation_space[0]),
+        "obs_space": gym.spaces.flatten_space(env.observation_space[0].spaces["fov"]),
         "act_space": act_space,
         "num_agents": num_agents,
     }

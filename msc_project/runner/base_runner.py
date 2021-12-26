@@ -23,7 +23,6 @@ class BaseRunner(object):
         self.train_interval = self.args.train_interval
 
         self.save_interval = self.args.save_interval
-        self.running_avg_size = self.args.running_avg_size
         self.num_eval_episodes = self.args.num_eval_episodes
 
         self.algorithm_name = self.args.algorithm_name
@@ -77,10 +76,16 @@ class BaseRunner(object):
             ep_info = self.run_episode(explore=True, training_episode=True)
             self.num_episodes += 1
 
-            # log episode info
-            self.log(ep_info)
+            # store episode info
+            self.store_train_info(ep_info)
+
+            # print
+            self.print_between_train_ep(ep_info)
 
             self.total_env_steps += ep_info["env_steps"]
+
+        # log sampled info during training
+        self.log_epoch_info()
 
         # end of epoch handling
         epoch = self.num_episodes // self.episodes_per_epoch
@@ -91,6 +96,7 @@ class BaseRunner(object):
 
         self.eval_agent()
 
+        # log general epoch info
         self.logger.log("epoch", epoch)
         self.logger.log("reward", with_min_and_max=True)
         self.logger.log("test_reward", with_min_and_max=True)
@@ -105,44 +111,14 @@ class BaseRunner(object):
     def run_episode(self, explore=True, training_episode=True, warmup=False):
         raise NotImplementedError
 
-    def log(self, ep_info):
+    def store_train_info(self, ep_info):
         raise NotImplementedError
 
-    def log_eval(self, ep_info):
+    def print_between_train_ep(self, ep_info):
         raise NotImplementedError
 
-    # def log(self, env_info):
-    #     steps = env_info["ep_steps"]
-    #     score = env_info["ep_reward"]
-    #     n_collisions = env_info["collisions"]
-    #     n_unique_collisions = env_info["unique_collisions"]
-    #     timedout = env_info["timedout"]
-    #     success = not timedout and n_collisions == 0
-
-    #     # save stats to results
-    #     self.results.append([self.num_episodes, score, steps, success, n_collisions, n_unique_collisions, timedout])
-
-    #     # calculate avg score
-    #     max_els = min(len(self.results), self.running_avg_size)
-    #     last_hist = np.array(self.results[-max_els:])
-    #     avg_score = np.mean(last_hist[:, 1])
-
-    #     # set best score (but first after number of episodes as size of running average)
-    #     if self.num_episodes >= self.running_avg_size:
-    #         if self.best_score == None:
-    #             self.best_score = avg_score
-    #             self.save_best()
-    #         elif avg_score > self.best_score:
-    #             self.best_score = avg_score
-    #             self.save_best()
-
-    #     print(f"Episode {self.num_episodes}. {steps} steps. Noise std: {self.agent.noise.std}")
-    #     if n_collisions == 0:
-    #         print(f"\tSUCCES\tScore = {score}\tAvg. score = {avg_score}")
-    #     else:
-    #         print(
-    #             f"\tFAILED\tCollisions = {n_unique_collisions}/{n_collisions} \tScore = {score}\tAvg. score = {avg_score}"
-    #         )
+    def log_epoch_info(self):
+        raise NotImplementedError
 
     def learn(self):
         self.agent.learn()
@@ -160,7 +136,7 @@ class BaseRunner(object):
         # TODO call this method
         print(f"New best model found in episode {self.num_episodes}")
 
-        path = self.save_dir + "/best"
+        path = self.save_dir + f"/best_ep_{self.num_episodes}"
         if not os.path.exists(path):
             os.makedirs(path)
 

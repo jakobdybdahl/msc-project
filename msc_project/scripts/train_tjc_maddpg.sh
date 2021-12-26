@@ -20,7 +20,6 @@ max_episode_length=500
 actor_train_interval_step=1
 train_interval=2
 save_interval=100
-running_avg_size=50
 step_cost_factor=-0.01
 collision_cost=-100
 arrive_prob=0.05
@@ -56,7 +55,6 @@ do
   --actor_train_interval_step ${actor_train_interval_step} \
   --train_interval ${train_interval} \
   --save_interval ${save_interval} \
-  --running_avg_size ${running_avg_size} \
   --step_cost_factor ${step_cost_factor} \
   --collision_cost ${collision_cost} \
   --arrive_prob ${arrive_prob} \
