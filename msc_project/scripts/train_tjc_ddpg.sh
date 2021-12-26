@@ -3,7 +3,7 @@
 algo="ddpg"
 experiment="default-tjc-env"
 env="tjc_gym:TrafficJunctionContinuous6-v0"
-render=True
+# render=True
 buffer_size=1000000
 hidden_size1=400
 hidden_size2=300
@@ -20,10 +20,10 @@ act_noise_decay_end_step=300000
 max_agent_episode_steps=500
 actor_train_interval_step=1
 train_interval=1
-episodes_per_epoch=10
+episodes_per_epoch=20
 epochs=100
-num_eval_episodes=10
-save_interval=1
+num_eval_episodes=100
+save_interval=10
 step_cost_factor=-0.01
 collision_cost=-10
 arrive_prob=0.05
@@ -36,7 +36,7 @@ if [[ $USER = "ucloud" ]]; then
   source /work/scripts/setup_ucloud.sh
 fi
 
-seeds=(2)
+seeds=(1 2 3 4 5)
 for seed in "${seeds[@]}"
 do
   echo "Running experiment with seed = ${seed}"
