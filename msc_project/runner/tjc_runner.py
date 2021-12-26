@@ -1,3 +1,6 @@
+import sys
+from os import system
+
 import numpy as np
 import torch as T
 from msc_project.runner.base_runner import BaseRunner
@@ -102,6 +105,8 @@ class TJCRunner(BaseRunner):
 
         result = "SUCCESS" if not np.any(ep_info["collisions"]) else "FAILED"
         print(f"\t{result} \tCollisions = {ep_info['collisions']} \tScore = {sum_reward}")
+
+        sys.stdout.flush()
 
     def warmup(self, num_warmup_eps):
         warmup_rewards = []
