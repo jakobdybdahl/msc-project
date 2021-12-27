@@ -3,22 +3,22 @@ algo="maddpg"
 experiment="pure_maddpg_v0"
 env="tjc_gym:TrafficJunctionContinuous6-v0"
 # render=True
-buffer_size=1000000
+buffer_size=500000
 hidden_size1=400
 hidden_size2=300
-lr_actor=0.001
-lr_critic=0.001
+lr_actor=0.01
+lr_critic=0.01
 weight_decay=0
-tau=0.001
+tau=0.01
 batch_size=128
-gamma=0.99
+gamma=0.95
 num_random_episodes=1
 act_noise_std_start=0.3
 act_noise_std_min=0.01
-act_noise_decay_end_step=300000
+act_noise_decay_end_step=2500000
 max_agent_episode_steps=500
-actor_train_interval_step=1
-train_interval=1
+actor_train_interval_step=10
+train_interval=10
 episodes_per_epoch=20
 epochs=100
 num_eval_episodes=100
@@ -30,7 +30,7 @@ fov_radius=3
 
 echo "Env is ${env} and algo is ${algo}"
 
-seeds=(1)
+seeds=(1 2 3 4 5)
 for seed in "${seeds[@]}"
 do
   echo "Running experiment with seed = ${seed}"
