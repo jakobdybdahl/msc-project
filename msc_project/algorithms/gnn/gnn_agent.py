@@ -83,7 +83,7 @@ class GNNAgent(object):
 
     def get_actions(self, obs, explore=True):
         # TODO how to remove this knowledge to the environment?
-        fov, who_in_fov = obs.fov, obs.who_in_fov
+        fov, who_in_fov = obs["fov"], obs["who_in_fov"]
 
         actions = []
 
@@ -113,10 +113,10 @@ class GNNAgent(object):
 
     def store_transistion(self, obs, acts, rewards, nobs, dones, info):
         # TODO remove knowledge on the environment
-        fovs = obs.fov
-        comms = obs.who_in_fov
-        nfovs = nobs.fov
-        ncomms = nobs.who_in_fov
+        fovs = obs["fov"]
+        comms = obs["who_in_fov"]
+        nfovs = nobs["fov"]
+        ncomms = nobs["who_in_fov"]
 
         for agent_i in range(self.n_agents):
             done = dones[agent_i] or not info["cars_on_road"][agent_i]
