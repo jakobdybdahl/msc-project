@@ -168,6 +168,8 @@ class TJCRunner(BaseRunner):
 
         sys.stdout.flush()
 
+        sys.stdout.flush()
+
     def warmup(self, num_warmup_eps):
         warmup_rewards = []
         print("Warm up...")

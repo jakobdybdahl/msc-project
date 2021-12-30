@@ -84,8 +84,11 @@ class MADDPGAgent:
     def get_random_actions(self, obs):
         return [self.act_space.sample()[0] for _ in range(len(obs))]
 
-    def reset(self):
-        self.brain.reset()
+    def save_models(self, path=None):
+        self.brain.save_models(path)
+
+    def load_models(self, path=None):
+        self.brain.load_models(path)
 
     def learn(self):
 

@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import os
 
 def hidden_init(layer):
     fan_in = layer.weight.data.size()[0]
@@ -12,7 +13,7 @@ def hidden_init(layer):
 
 class ActorNetwork(nn.Module):
 
-    def __init__(self, observation_size, action_size):
+    def __init__(self, observation_size, action_size, name):
         """
         :param observation_size: observation size
         :param action_size: action size
@@ -33,6 +34,8 @@ class ActorNetwork(nn.Module):
         self.fc2 = nn.Linear(fc1_units, fc2_units, bias=False)
         self.fc3 = nn.Linear(fc2_units, action_size, bias=False)
 
+        self.name = name
+
         self.reset_parameters()
 
     def forward(self, observation):
@@ -52,10 +55,22 @@ class ActorNetwork(nn.Module):
         self.fc2.weight.data.uniform_(*hidden_init(self.fc2))
         self.fc3.weight.data.uniform_(*hidden_init(self.fc3))
 
+    def save_checkpoint(self, path):
+        file = os.path.join(path, self.name)
+        torch.save(self.state_dict(), file)
+
+    def load_checkpoint(self, path):
+        file = os.path.join(path, self.name)
+        self.load_state_dict(torch.load(file))
+
+    def save_best(self, path):
+        file = os.path.join(path, self.name + "_best")
+        torch.save(self.state_dict(), file)
+
 
 class CriticNetwork(nn.Module):
 
-    def __init__(self, observation_size, action_size):
+    def __init__(self, observation_size, action_size, name):
         """
         :param observation_size: Dimension of each state
         :param action_size: Dimension of each state
@@ -73,6 +88,8 @@ class CriticNetwork(nn.Module):
         self.fc1 = nn.Linear(observation_size + action_size, fc1_units, bias=False)
         self.fc2 = nn.Linear(fc1_units, fc2_units)
         self.fc3 = nn.Linear(fc2_units, 1)
+
+        self.name = name
 
         self.reset_parameters()
 
@@ -93,3 +110,15 @@ class CriticNetwork(nn.Module):
         self.fc1.weight.data.uniform_(*hidden_init(self.fc1))
         self.fc2.weight.data.uniform_(*hidden_init(self.fc2))
         self.fc3.weight.data.uniform_(*hidden_init(self.fc3))
+
+    def save_checkpoint(self, path):
+        file = os.path.join(path, self.name)
+        torch.save(self.state_dict(), file)
+
+    def load_checkpoint(self, path):
+        file = os.path.join(path, self.name)
+        self.load_state_dict(torch.load(file))
+
+    def save_best(self, path):
+        file = os.path.join(path, self.name + "_best")
+        torch.save(self.state_dict(), file)
