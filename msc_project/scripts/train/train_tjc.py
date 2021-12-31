@@ -101,8 +101,12 @@ def main(args):
     logger.save_config(all_args.__dict__)
 
     # setup info for policies
+    if "v1" in all_args.env_name:
+        obs_space = gym.spaces.flatten_space(env.observation_space[0])
+    else:
+        obs_space = gym.spaces.flatten_space(env.observation_space[0].spaces["fov"])
     policy_info = {
-        "obs_space": gym.spaces.flatten_space(env.observation_space[0].spaces["fov"]),
+        "obs_space": obs_space,
         "act_space": act_space,
         "num_agents": num_agents,
     }

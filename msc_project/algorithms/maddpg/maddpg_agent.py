@@ -1,19 +1,21 @@
-import numpy as np
 import random
-import torch
 
+import numpy as np
+import torch
 from msc_project.utils.noise import GaussianActionNoise
 
-from .buffer import ReplayBuffer
 from .brain import Brain
+from .buffer import ReplayBuffer
 
 
 class MADDPGAgent:
-    def __init__(self,
-                args,
-                policy_info,
-                device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'),
-                ):
+    def __init__(
+        self,
+        args,
+        policy_info,
+        device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
+    ):
+        self.args = args
 
         self.act_space = policy_info["act_space"]
         self.obs_dim = policy_info["obs_space"].shape[0]
@@ -34,19 +36,14 @@ class MADDPGAgent:
             soft_update_tau=args.tau,
             discount_gamma=args.gamma,
             noise=self.noise,
-            device=device
+            device=device,
         )
 
         self.device = device
         self._batch_size = args.batch_size
 
         # Replay memory
-        self.memory = ReplayBuffer(
-            self.act_dims,
-            args.buffer_size,
-            self._batch_size,
-            device
-        )
+        self.memory = ReplayBuffer(self.act_dims, args.buffer_size, self._batch_size, device)
 
         self.t_step = 0
 
@@ -60,24 +57,25 @@ class MADDPGAgent:
         :param train: True for training mode else eval mode
         :return: actions for given state as per current policy.
         """
-        actions = [
-            self.brain.act(obs[:, i], target, explore, train)
-            for i in range(self.agent_count)
-        ]
+        actions = [self.brain.act(obs[:, i], target, explore, train) for i in range(self.agent_count)]
 
         actions = torch.stack(actions).transpose(1, 0)
 
         return torch.clamp(actions, 0, 1)
 
-    def get_actions(self, obs, explore=True, target=False, ):
-        obs = torch.from_numpy(obs).float().\
-            to(self.device).unsqueeze(0)
+    def get_actions(
+        self,
+        obs,
+        explore=True,
+        target=False,
+    ):
+        if "v0" in self.args.env_name:
+            obs = obs["fov"]
+
+        obs = torch.from_numpy(obs).float().to(self.device).unsqueeze(0)
 
         with torch.no_grad():
-            actions = np.vstack([
-                a.cpu().numpy()
-                for a in self.act_torch(obs, target, explore)
-            ])
+            actions = np.vstack([a.cpu().numpy() for a in self.act_torch(obs, target, explore)])
 
         return actions.flatten()
 
@@ -101,39 +99,34 @@ class MADDPGAgent:
         all_actions = self._flatten(actions)
         all_next_obs = self._flatten(next_observations)
 
-        all_target_next_actions = self._flatten(self.act_torch(
-            next_observations,
-            target=True,
-            train=False
-        ).contiguous())
+        all_target_next_actions = self._flatten(
+            self.act_torch(next_observations, target=True, train=False).contiguous()
+        )
 
-        all_local_actions = self.act_torch(
-            observations,
-            target=False,
-            train=True
-        ).contiguous()
+        all_local_actions = self.act_torch(observations, target=False, train=True).contiguous()
 
         for i in range(self.agent_count):
             # update critics
             self.brain.update_critic(
-                rewards[:, i].unsqueeze(-1), dones[:, i].unsqueeze(-1),
-                all_obs, all_actions, all_next_obs, all_target_next_actions
+                rewards[:, i].unsqueeze(-1),
+                dones[:, i].unsqueeze(-1),
+                all_obs,
+                all_actions,
+                all_next_obs,
+                all_target_next_actions,
             )
 
             # update actors
             all_local_actions_agent = all_local_actions.detach()
             all_local_actions_agent[:, i] = all_local_actions[:, i]
             all_local_actions_agent = self._flatten(all_local_actions_agent)
-            self.brain.update_actor(
-                all_obs, all_local_actions_agent.detach()
-            )
+            self.brain.update_actor(all_obs, all_local_actions_agent.detach())
 
             # update targets
             self.brain.update_targets()
 
     def _tensor_experiences(self, experiences):
-        ob, actions, rewards, next_ob, dones = \
-            [torch.from_numpy(e).float().to(self.device) for e in experiences]
+        ob, actions, rewards, next_ob, dones = [torch.from_numpy(e).float().to(self.device) for e in experiences]
         return ob, actions, rewards, next_ob, dones
 
     @staticmethod
