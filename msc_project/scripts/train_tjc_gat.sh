@@ -37,7 +37,7 @@ if [[ $USER = "ucloud" ]]; then
   source /work/scripts/setup_ucloud.sh
 fi
 
-seeds=(1 2)
+seeds=(1)
 for seed in "${seeds[@]}"
 do
   echo "Running experiment with seed = ${seed}"
