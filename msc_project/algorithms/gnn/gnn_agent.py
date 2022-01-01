@@ -83,7 +83,7 @@ class GNNAgent(object):
 
     def get_actions(self, obs, explore=True):
         # TODO how to remove this knowledge to the environment?
-        fov, who_in_fov = obs.fov, obs.who_in_fov
+        fov, who_in_fov = obs["fov"], obs["who_in_fov"]
 
         actions = []
 
@@ -113,10 +113,10 @@ class GNNAgent(object):
 
     def store_transistion(self, obs, acts, rewards, nobs, dones, info):
         # TODO remove knowledge on the environment
-        fovs = obs.fov
-        comms = obs.who_in_fov
-        nfovs = nobs.fov
-        ncomms = nobs.who_in_fov
+        fovs = obs["fov"]
+        comms = obs["who_in_fov"]
+        nfovs = nobs["fov"]
+        ncomms = nobs["who_in_fov"]
 
         for agent_i in range(self.n_agents):
             done = dones[agent_i] or not info["cars_on_road"][agent_i]
@@ -194,28 +194,29 @@ class GNNAgent(object):
         self.update_network_parameters()
 
     def update_network_parameters(self, tau=None):
-        if tau is None:
-            tau = self.tau
+        with T.no_grad():
+            if tau is None:
+                tau = self.tau
 
-        actor_params = self.actor.named_parameters()
-        critic_params = self.critic.named_parameters()
-        target_actor_params = self.target_actor.named_parameters()
-        target_critic_params = self.target_critic.named_parameters()
+            actor_params = self.actor.state_dict().items()
+            critic_params = self.critic.state_dict().items()
+            target_actor_params = self.target_actor.state_dict().items()
+            target_critic_params = self.target_critic.state_dict().items()
 
-        critic_state_dict = dict(critic_params)
-        actor_state_dict = dict(actor_params)
-        target_critic_state_dict = dict(target_critic_params)
-        target_actor_state_dict = dict(target_actor_params)
+            critic_state_dict = dict(critic_params)
+            actor_state_dict = dict(actor_params)
+            target_critic_state_dict = dict(target_critic_params)
+            target_actor_state_dict = dict(target_actor_params)
 
-        for name in critic_state_dict:
-            critic_state_dict[name] = (
-                tau * critic_state_dict[name].clone() + (1 - tau) * target_critic_state_dict[name].clone()
-            )
+            for name in critic_state_dict:
+                critic_state_dict[name] = (
+                    tau * critic_state_dict[name].clone() + (1 - tau) * target_critic_state_dict[name].clone()
+                )
 
-        for name in actor_state_dict:
-            actor_state_dict[name] = (
-                tau * actor_state_dict[name].clone() + (1 - tau) * target_actor_state_dict[name].clone()
-            )
+            for name in actor_state_dict:
+                actor_state_dict[name] = (
+                    tau * actor_state_dict[name].clone() + (1 - tau) * target_actor_state_dict[name].clone()
+                )
 
-        self.target_actor.load_state_dict(actor_state_dict)
-        self.target_critic.load_state_dict(critic_state_dict)
+            self.target_actor.load_state_dict(actor_state_dict)
+            self.target_critic.load_state_dict(critic_state_dict)

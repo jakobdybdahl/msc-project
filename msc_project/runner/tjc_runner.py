@@ -1,8 +1,6 @@
 import sys
-from os import system
 
 import numpy as np
-import torch as T
 from msc_project.runner.base_runner import BaseRunner
 
 
@@ -16,8 +14,11 @@ class TJCRunner(BaseRunner):
         self._init_train_values()
 
         # warmup
-        num_warmup_eps = max((int(self.batch_size // self.max_agent_episode_steps) + 1, self.args.num_random_episodes))
-        self.warmup(num_warmup_eps)
+        if not self.is_eval_run:
+            num_warmup_eps = max(
+                (int(self.batch_size // self.max_agent_episode_steps) + 1, self.args.num_random_episodes)
+            )
+            self.warmup(num_warmup_eps)
 
     def _init_train_values(self):
         self.train_num_success = 0
