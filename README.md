@@ -74,7 +74,7 @@ To reproduce any of the results in the report run the scripts:
 
 | Agent    | Script                                               |
 | -------- | ---------------------------------------------------- |
-| Baseline | `python ./msc_project/baselines/traffic-light-agent` |
+| Baseline | `python ./msc_project/baselines/traffic-light-agent.py` |
 | DDPG     | `source msc_project/scripts/train_tjc_ddpg.sh`       |
 | MADDPG   | `source msc_project/scripts/train_tjc_maddpg.sh`     |
 | DDPG+GAT | `source msc_project/scripts/train_tjc_gat.sh`        |
