@@ -20,7 +20,7 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-**PyTorch** (only one of the two scripts)
+### PyTorch (only one of the two following commands)
 
 With CUDA enabled (requires Windows and Nvidia graphic card to utilize):
 
@@ -34,7 +34,7 @@ or without CUDA:
 pip install torch torchvision torchaudio
 ```
 
-**PyTorch Geometric** (only one of the two scripts)
+### PyTorch Geometric (only one of the two following commands)
 
 With Cuda enabled (requires Windows and Nvidia graphic card to utilize)
 
@@ -74,7 +74,7 @@ To reproduce any of the results in the report run the scripts:
 
 | Agent    | Script                                               |
 | -------- | ---------------------------------------------------- |
-| Baseline | `python ./msc_project/baselines/traffic-light-agent` |
+| Baseline | `python ./msc_project/baselines/traffic-light-agent.py` |
 | DDPG     | `source msc_project/scripts/train_tjc_ddpg.sh`       |
 | MADDPG   | `source msc_project/scripts/train_tjc_maddpg.sh`     |
 | DDPG+GAT | `source msc_project/scripts/train_tjc_gat.sh`        |
