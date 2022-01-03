@@ -63,10 +63,10 @@ python ./msc_project/scripts/train/train_tjc.py --algorithm_name ddpg --render T
 Run the following script in project folder
 
 ```bash
-python ./msc_project/scripts/train/train_tjc.py --algorithm_name ddpg --render True --model_dir "./msc_project/models/ddpg/seed_9_ep_1260"
+python ./msc_project/scripts/train/train_tjc.py --algorithm_name ddpg --render True --model_dir "./msc_project/models/ddpg/netwoks"
 ```
 
-Other models can be found under the folder `models`.
+Other models can be found in the folder `models`.
 
 # Reproduce experiment results
 
