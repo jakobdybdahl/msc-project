@@ -63,7 +63,7 @@ python ./msc_project/scripts/train/train_tjc.py --algorithm_name ddpg --render T
 Run the following script in project folder
 
 ```bash
-python ./msc_project/scripts/train/train_tjc.py --algorithm_name ddpg --render True --model_dir "./msc_project/models/ddpg/netwoks"
+python ./msc_project/scripts/train/train_tjc.py --algorithm_name ddpg --render True --model_dir "./msc_project/models/ddpg/networks"
 ```
 
 Other models can be found in the folder `models`.
