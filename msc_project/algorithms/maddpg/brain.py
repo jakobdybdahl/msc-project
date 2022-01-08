@@ -44,14 +44,6 @@ class Brain:
         return self._critic_local.state_dict(), self._critic_target.state_dict()
 
     def act(self, observation, target=False, explore=True, train=False):
-        """
-        :param observation: tensor of shape == (b, observation_size)
-        :param target: true to evaluate with target
-        :param noise: OU noise factor
-        :param train: True for training mode else eval mode
-        :return: action: tensor of shape == (b, action_size)
-        """
-
         actor = self._actor_target if target else self._actor_local
 
         if train:
@@ -68,13 +60,6 @@ class Brain:
         return action_values + noise
 
     def update_actor(self, all_obs, all_pred_actions):
-        """
-        Actor
-        :param all_obs: array of shape == (b, observation_size * n_agents)
-        :param all_pred_actions: array of shape == (b, action_size * n_agents)
-        :return:
-        """
-
         actor_loss = -self._critic_local(all_obs, all_pred_actions).mean()
 
         self._actor_optimizer.zero_grad()
@@ -83,16 +68,6 @@ class Brain:
 
     def update_critic(self, rewards, dones,
                       all_obs, all_actions, all_next_obs, all_next_actions):
-        """
-        Critic receives observation and actions of all agents as input
-        :param rewards: array of shape == (b, 1)
-        :param dones: array of shape == (b, 1)
-        :param all_obs: array of shape == (b, n_agents, observation_size)
-        :param all_actions: array of shape == (b, n_agents, action_size)
-        :param all_next_obs:  array of shape == (b, n_agents, observation_size)
-        :param all_next_actions: array of shape == (b, n_agents, action_size)
-        """
-
         with torch.no_grad():
             q_target_next = self._critic_target(all_next_obs, all_next_actions)
 
