@@ -65,7 +65,7 @@ def get_config():
     parser.add_argument(
         "--act_noise_decay_end_step",
         type=int,
-        default=200000,
+        default=300000,
         help="Number of environment steps where noise should be added to actions",
     )
 

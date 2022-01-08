@@ -14,6 +14,7 @@ class BaseRunner(object):
         self.args = config["args"]
         self.device = config["device"]
 
+        self.is_eval_run = False
         self.num_epochs = self.args.epochs
         self.episodes_per_epoch = self.args.episodes_per_epoch
 
@@ -34,8 +35,6 @@ class BaseRunner(object):
         # TODO parralel envs?
         self.env = config["env"]
         self.env_name = self.args.env_name
-
-        # TODO evaluation env?
 
         # dir
         self.run_dir = config["run_dir"]
@@ -62,6 +61,11 @@ class BaseRunner(object):
 
         self.agent = Agent(self.args, self.policy_info, self.device)
 
+        # load model if this is a evaluation run
+        if self.args.model_dir is not None:
+            self.is_eval_run = True
+            self.agent.load_models(self.args.model_dir)
+
         # variables used during training
         self.total_env_steps = 0
         self.num_episodes = 0
@@ -72,7 +76,16 @@ class BaseRunner(object):
     def eval_agent(self):
         raise NotImplementedError
 
+    def run_eval(self):
+        print("Running eval epoch..")
+        for _ in range(self.episodes_per_epoch):
+            self.run_episode(explore=False, training_episode=False)
+
     def run_epoch(self):
+        if self.is_eval_run:
+            self.run_eval()
+            return
+
         for _ in range(self.episodes_per_epoch):
             # get episode
             ep_info = self.run_episode(explore=True, training_episode=True)
