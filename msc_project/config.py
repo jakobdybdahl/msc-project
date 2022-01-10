@@ -71,7 +71,7 @@ def get_config():
 
     # train parameters
     parser.add_argument(
-        "--max_agent_episode_steps", type=int, default=500, help="Max number of steps for a single agent in an episode"
+        "--max_agent_episode_steps", type=int, default=1000, help="Max number of steps for a single agent in an episode"
     )
     parser.add_argument(
         "--actor_train_interval_step", type=int, default=1, help="After how many critic updates actor should be updated"

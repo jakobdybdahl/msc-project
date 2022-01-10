@@ -9,10 +9,12 @@ import torch_geometric
 from msc_project.config import get_config
 from msc_project.runner.tjc_runner import TJCRunner
 from msc_project.utils.logger import EpochLogger
+from tjc_gym.envs.traffic_junction_continuous_env import TrafficJunctionContinuousEnv
 
 
 def make_train_env(args):
-    env = gym.make(args.env_name)
+    # env = gym.make(args.env_name)
+    env = TrafficJunctionContinuousEnv(n_max=40, n_intersections=4)
     env.seed(args.seed)
 
     # prepare action space (represents all action spaces)
@@ -20,7 +22,7 @@ def make_train_env(args):
     act_space.seed(args.seed)
 
     # gym wraps the original env, so we get the inner and sets variables from args
-    inner = env.env
+    inner = env
     inner.set_r_fov(args.fov_radius)
     inner.arrive_prob = args.arrive_prob
     inner.step_cost = args.step_cost_factor
@@ -36,7 +38,7 @@ def make_train_env(args):
 def parse_args(args, parser):
     parser.add_argument("--step_cost_factor", type=float, default=-0.01)
     parser.add_argument("--collision_cost", type=float, default=-10)
-    parser.add_argument("--arrive_prob", type=float, default=0.05)
+    parser.add_argument("--arrive_prob", type=float, default=0.08)
     parser.add_argument("--fov_radius", type=int, default=3)
 
     return parser.parse_known_args(args)[0]
