@@ -4,7 +4,7 @@ import argparse
 def get_config():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--algorithm_name", type=str, default="ddpg", choices=["maddpg", "ddpg", "gnn"])
+    parser.add_argument("--algorithm_name", type=str, default="ddpg", choices=["maddpg", "ddpg", "gnn", "gat-maddpg"])
     parser.add_argument("--experiment_name", type=str, default="debug")
     parser.add_argument("--seed", type=int, default=2, help="random seed for numpy/torch")
 
