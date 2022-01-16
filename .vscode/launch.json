@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "./msc_project/scripts/train/train_tjc.py",
             "console": "integratedTerminal",
-            "args": ["--algorithm_name=gat-maddpg", "--render=1"]
+            "args": ["--algorithm_name=maddpg", "--render=1"]
         }
     ]
 }
