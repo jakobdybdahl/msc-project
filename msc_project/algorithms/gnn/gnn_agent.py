@@ -153,21 +153,30 @@ class GNNAgent(object):
         data_list = []
         ndata_list = []
 
+        # agent_idx is batch_size long, so 'b' is each batch, for instance from 0 to 127
         for b in range(len(agent_idx)):
-            comm = comms[b]
+            comm = comms[b] # comms are agent specific
             ncomm = ncomms[b]
 
             edge_index = self._get_edge_index(comm)
             n_edge_index = self._get_edge_index(ncomm)
 
+            # fovs[b] are six fovs for this sample
+            # edge_index is the connections between the nodes in the fov seen from this agent.
+            # Each graph are constructed based on a single agents fov (see store_transistion)
             data_list.append(Data(x=fovs[b], edge_index=edge_index))
             ndata_list.append(Data(x=nfovs[b], edge_index=n_edge_index))
 
+        # Batch is one graph containg 128 disconnected graphs with nodes that contains fov and are connected based on the edge_index
+        # The Batch-structure ensures that the edge_index are handled properly by incrementing them
         batch = Batch.from_data_list(data_list).to(self.device)
         nbatch = Batch.from_data_list(ndata_list).to(self.device)
 
+        # Agent_mask is used to filter out the global knowledge when training
+        # However, we are dependent on n_agents during training - which is fine.
         agent_mask = T.zeros_like(batch.batch, dtype=T.bool)
         for i, a in enumerate(agent_idx):
+            # Agent mask is 128x6=768 but 1D/flat
             agent_mask[i * self.n_agents + a] = True
 
         target_actions = self.target_actor.forward(nbatch, agent_mask)
