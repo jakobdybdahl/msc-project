@@ -58,6 +58,7 @@ class CriticNetwork(nn.Module):
         self.to(self.device)
 
     def forward(self, data, action, agent_mask):
+        # See actor
         x = self.conv1(data.x, data.edge_index)
         x = x[agent_mask, :]
         x = F.relu(x)
@@ -128,8 +129,10 @@ class ActorNetwork(nn.Module):
         self.to(self.device)
 
     def forward(self, data, agent_mask):
+        # x dim: 128x6=768 in 1D/flat (batch_size * n_agents)
+        # And contains embeddings of size hidden_dim, so the dim is 768 * hidden_dims in 2D
         x = self.conv1(data.x, data.edge_index)
-        x = x[agent_mask, :]
+        x = x[agent_mask, :] # Only include embeddings for agents of interest
         x = F.relu(x)
 
         x = self.fc1(x)
