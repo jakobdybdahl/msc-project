@@ -139,7 +139,9 @@ class GNNAgent(object):
     def learn(self):
         if self.memory.mem_cntr < self.batch_size:
             return
-
+        
+        # Comms is an array with for instance [0, 1, 1] if the current agent is connected to agent 2 and 3. 
+        # One entry of comms, action, rewards and dones are for one agent. fovs are everybodys fov.
         agent_idx, fovs, comms, actions, rewards, nfovs, ncomms, dones = self.memory.sample_buffer(self.batch_size)
 
         agent_idx = T.tensor(agent_idx, dtype=T.int).to(self.device)
@@ -155,9 +157,10 @@ class GNNAgent(object):
 
         # agent_idx is batch_size long, so 'b' is each batch, for instance from 0 to 127
         for b in range(len(agent_idx)):
-            comm = comms[b] # comms are agent specific
+            comm = comms[b] # comms are agent specific, 
             ncomm = ncomms[b]
 
+            # Contains the connections this agent
             edge_index = self._get_edge_index(comm)
             n_edge_index = self._get_edge_index(ncomm)
 
